@@ -310,10 +310,10 @@
     <div class="memory-line" aria-hidden="true">上城区民政局 · 一纸婚书 一生偏爱</div>
 
     <section id="viewer" class="viewer fixed inset-0 z-50 grid place-items-center p-4 sm:p-8" aria-hidden="true" aria-label="照片预览">
-      <div class="viewer-frame relative max-h-[92vh] max-w-[94vw]" role="dialog" aria-modal="true">
+      <div class="viewer-frame relative grid max-h-[92vh] max-w-[94vw] place-items-center" role="dialog" aria-modal="true">
         <button id="closeViewer" class="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-md border border-white/20 bg-black/55 text-2xl font-black leading-none text-white shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:bg-black/75" type="button" aria-label="关闭">×</button>
-        <img id="viewerImage" class="block max-h-[88vh] max-w-[94vw] rounded-lg border border-white/20 bg-[#120609] object-contain shadow-2xl shadow-black/60" src="" alt="" />
-        <div class="absolute bottom-3 left-1/2 grid -translate-x-1/2 grid-cols-3 gap-2 rounded-lg border border-white/15 bg-black/45 p-2 shadow-2xl backdrop-blur-xl">
+        <img id="viewerImage" class="mx-auto block max-h-[88vh] max-w-[94vw] rounded-lg border border-white/20 bg-[#120609] object-contain object-center shadow-2xl shadow-black/60" src="" alt="" />
+        <div class="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center justify-center gap-2 rounded-lg border border-white/15 bg-black/45 p-2 shadow-2xl backdrop-blur-xl">
           <button id="prevPhoto" class="grid h-10 w-12 place-items-center rounded-md border border-white/20 bg-white/10 text-2xl font-black leading-none text-white transition hover:-translate-y-0.5 hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button" aria-label="上一张">‹</button>
           <a id="viewerOriginal" class="grid h-10 w-16 place-items-center rounded-md border border-white/20 bg-white/10 text-[13px] font-extrabold text-white no-underline transition hover:-translate-y-0.5 hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" href="#" target="_blank" rel="noreferrer">原图</a>
           <button id="nextPhoto" class="grid h-10 w-12 place-items-center rounded-md border border-white/20 bg-white/10 text-2xl font-black leading-none text-white transition hover:-translate-y-0.5 hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button" aria-label="下一张">›</button>
@@ -564,7 +564,6 @@
 
         card.appendChild(img); // 把缩略图加入卡片
         card.addEventListener("pointerup", (event) => {
-          event.stopPropagation(); // 阻止抬起事件继续冒泡到控制器
           pointerTracking = false; // 卡片内抬起时也结束拖拽跟踪
           pointerDownPhotoIndex = -1; // 清理按下时记录的照片索引
           if (pointerMoved) return; // 拖拽后不触发照片预览
@@ -757,7 +756,7 @@
         if (index < 0) return; // 没有点到照片时不处理
         if (pointerMoved) return; // 发生拖拽时不打开预览
         event.preventDefault(); // 阻止按钮默认行为避免重复触发
-        event.stopPropagation(); // 阻止事件继续交给 3D 控制器
+        // 允许 pointerup 继续传给 OrbitControls，让它结束本次拖拽状态
         requestOpenViewer(index); // 打开照片预览
       }
 
