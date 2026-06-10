@@ -1,10 +1,796 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Title</title>
-</head>
-<body>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>2026.06.07 杭州上城区领证 3D 照片墙</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        --ink: #fff6ed;
+        --muted: rgba(255, 246, 237, 0.72);
+        --red: #9f1726;
+        --deep-red: #24070c;
+        --gold: #f3c56b;
+        --jade: #0f7d7a;
+        --card-w: 164px;
+        --feature-w: 184px;
+        --panel: rgba(29, 9, 12, 0.68);
+      }
 
-</body>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      body {
+        color: var(--ink);
+        font-family:
+          Inter, "PingFang SC", "Microsoft YaHei", system-ui, -apple-system,
+          BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+        background:
+          linear-gradient(118deg, rgba(18, 6, 9, 0.98) 0%, rgba(116, 20, 32, 0.92) 44%, rgba(29, 91, 86, 0.84) 100%),
+          repeating-linear-gradient(100deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 28px),
+          #16070b;
+      }
+
+      body::before {
+        position: fixed;
+        inset: -22px;
+        content: "";
+        pointer-events: none;
+        background-image:
+          linear-gradient(90deg, rgba(16, 5, 8, 0.62), rgba(16, 5, 8, 0.32)),
+          url("assets/photo-wall/thumbs/retouched-DSC04940.jpg");
+        background-position: center;
+        background-size: cover;
+        filter: blur(16px) saturate(1.04);
+        opacity: 0.36;
+        transform: scale(1.06);
+      }
+
+      body::after {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        content: "";
+        pointer-events: none;
+        background:
+          linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0%, transparent 34%, rgba(0, 0, 0, 0.36) 100%),
+          repeating-linear-gradient(0deg, rgba(255, 238, 203, 0.035) 0 1px, transparent 1px 7px);
+        mix-blend-mode: soft-light;
+      }
+
+      .stage {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+      }
+
+      .stage > div {
+        position: absolute;
+        inset: 0;
+      }
+
+      button.is-active {
+        color: #26090b;
+        background: linear-gradient(90deg, #f1bd57, #ffe4a7);
+        border-color: rgba(255, 246, 237, 0.82);
+      }
+
+      .seal {
+        position: fixed;
+        right: 34px;
+        bottom: 34px;
+        z-index: 4;
+        display: grid;
+        place-items: center;
+        width: 112px;
+        height: 112px;
+        color: #ffd577;
+        font-size: 20px;
+        font-weight: 900;
+        line-height: 1.18;
+        text-align: center;
+        pointer-events: none;
+        border: 3px solid rgba(255, 213, 119, 0.62);
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 8px rgba(255, 213, 119, 0.08), 0 18px 54px rgba(0, 0, 0, 0.3);
+        transform: rotate(-10deg);
+      }
+
+      .seal::before,
+      .seal::after {
+        position: absolute;
+        inset: 10px;
+        content: "";
+        border: 1px solid rgba(255, 213, 119, 0.5);
+        border-radius: 50%;
+      }
+
+      .seal::after {
+        inset: 18px;
+        border-style: dashed;
+      }
+
+      .memory-line {
+        position: fixed;
+        bottom: 26px;
+        left: 28px;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: rgba(255, 246, 237, 0.78);
+        font-size: 13px;
+        font-weight: 700;
+        pointer-events: none;
+      }
+
+      .memory-line::before {
+        width: 78px;
+        height: 1px;
+        content: "";
+        background: linear-gradient(90deg, var(--gold), rgba(255, 255, 255, 0));
+      }
+
+      .photo-card {
+        position: relative;
+        width: var(--card-w);
+        aspect-ratio: 3 / 2;
+        overflow: hidden;
+        color: #fff;
+        background: #fff3e5;
+        border: 1px solid rgba(255, 240, 214, 0.48);
+        border-radius: 8px;
+        box-shadow:
+          0 12px 28px rgba(0, 0, 0, 0.3),
+          0 0 28px rgba(255, 202, 101, 0.12);
+        transform-style: preserve-3d;
+        transition:
+          filter 180ms ease,
+          opacity 180ms ease,
+          box-shadow 180ms ease;
+        user-select: none;
+      }
+
+      .photo-card[data-kind="retouched"] {
+        width: var(--feature-w);
+        aspect-ratio: 2 / 3;
+        border-color: rgba(255, 217, 138, 0.78);
+        box-shadow:
+          0 18px 36px rgba(0, 0, 0, 0.34),
+          0 0 42px rgba(255, 210, 118, 0.24);
+      }
+
+      .photo-card:hover {
+        filter: saturate(1.12) contrast(1.06);
+        box-shadow:
+          0 22px 44px rgba(0, 0, 0, 0.38),
+          0 0 46px rgba(255, 216, 133, 0.34);
+      }
+
+      .photo-card img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        pointer-events: none;
+      }
+
+      .photo-card::before {
+        position: absolute;
+        inset: 0;
+        content: "";
+        pointer-events: none;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 28%),
+          linear-gradient(0deg, rgba(0, 0, 0, 0.48), transparent 48%);
+      }
+
+      .photo-card::after {
+        position: absolute;
+        inset: 7px;
+        content: "";
+        pointer-events: none;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 5px;
+      }
+
+      .photo-card.is-missing {
+        display: grid;
+        place-items: center;
+        padding: 16px;
+        color: #4d1017;
+        font-size: 13px;
+        font-weight: 900;
+        text-align: center;
+      }
+
+      .viewer {
+        pointer-events: none;
+        background: rgba(11, 3, 5, 0);
+        opacity: 0;
+        transition:
+          opacity 180ms ease,
+          background 180ms ease;
+      }
+
+      .viewer.is-open {
+        pointer-events: auto;
+        background: rgba(11, 3, 5, 0.78);
+        opacity: 1;
+      }
+
+      .viewer-frame {
+        opacity: 0;
+        transform: translateY(34px) scale(0.62);
+        transition:
+          transform 360ms cubic-bezier(0.2, 0.82, 0.18, 1),
+          opacity 220ms ease;
+      }
+
+      .viewer.is-open .viewer-frame {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      @media (max-width: 900px) {
+        :root {
+          --card-w: 128px;
+          --feature-w: 140px;
+        }
+
+      }
+
+      @media (max-width: 560px) {
+        :root {
+          --card-w: 106px;
+          --feature-w: 118px;
+        }
+
+        .seal,
+        .memory-line {
+          display: none;
+        }
+
+        .viewer {
+          padding: 12px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.001ms !important;
+          animation-duration: 0.001ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="pointer-events-none fixed left-4 right-4 top-4 z-40 flex items-start justify-between gap-4 md:left-7 md:right-7 md:top-6" aria-label="领证照片墙信息">
+      <section class="max-w-[420px]" aria-label="领证纪念标题">
+        <span class="inline-flex h-7 items-center rounded-md border border-white/60 bg-gradient-to-r from-[#f8d47a] to-[#ffe7b8] px-3 text-[12px] font-extrabold text-[#251008] shadow-2xl">2026年6月7日 · 杭州上城区</span>
+        <h1 class="mt-3 max-w-[360px] text-[34px] font-black leading-none text-[#fff6ed] shadow-black/40 drop-shadow-2xl sm:text-[42px] lg:text-[64px]">我们领证啦</h1>
+        <p class="mt-3 hidden max-w-[430px] text-[15px] leading-7 text-white/75 sm:block">把这一天做成一面会旋转的照片墙，精修与底片一起收藏同一个心跳瞬间。</p>
+      </section>
+
+      <aside class="pointer-events-auto rounded-lg border border-white/20 bg-[#1d090c]/70 p-2 shadow-2xl shadow-black/30 backdrop-blur-xl" aria-label="照片墙控制">
+        <div class="grid grid-cols-4 gap-1.5 max-[560px]:grid-cols-2" aria-label="布局切换">
+          <button class="mode-button is-active h-9 rounded-md border border-white/20 bg-white/10 px-3 text-[13px] font-extrabold text-white transition hover:-translate-y-0.5 hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button" data-layout="heart">爱心</button>
+          <button class="mode-button h-9 rounded-md border border-white/20 bg-white/10 px-3 text-[13px] font-extrabold text-white transition hover:-translate-y-0.5 hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button" data-layout="orbit">星环</button>
+          <button class="mode-button h-9 rounded-md border border-white/20 bg-white/10 px-3 text-[13px] font-extrabold text-white transition hover:-translate-y-0.5 hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button" data-layout="certificate">婚书</button>
+          <button id="autoButton" class="is-active h-9 rounded-md border border-white/20 bg-white/10 px-3 text-[13px] font-extrabold text-white transition hover:-translate-y-0.5 hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button">旋转</button>
+        </div>
+      </aside>
+    </header>
+
+    <main id="stage" class="stage" aria-label="2026年6月7日杭州上城区领证3D照片墙"></main>
+
+    <div class="seal" aria-hidden="true">领证<br />2026</div>
+    <div class="memory-line" aria-hidden="true">上城区民政局 · 一纸婚书 一生偏爱</div>
+
+    <section id="viewer" class="viewer fixed inset-0 z-50 grid place-items-center p-4 sm:p-8" aria-hidden="true" aria-label="照片预览">
+      <div class="viewer-frame relative max-h-[92vh] max-w-[94vw]" role="dialog" aria-modal="true">
+        <button id="closeViewer" class="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-md border border-white/20 bg-black/55 text-2xl font-black leading-none text-white shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:bg-black/75" type="button" aria-label="关闭">×</button>
+        <img id="viewerImage" class="block max-h-[88vh] max-w-[94vw] rounded-lg border border-white/20 bg-[#120609] object-contain shadow-2xl shadow-black/60" src="" alt="" />
+        <div class="absolute bottom-3 left-1/2 grid -translate-x-1/2 grid-cols-3 gap-2 rounded-lg border border-white/15 bg-black/45 p-2 shadow-2xl backdrop-blur-xl">
+          <button id="prevPhoto" class="grid h-10 w-12 place-items-center rounded-md border border-white/20 bg-white/10 text-2xl font-black leading-none text-white transition hover:-translate-y-0.5 hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button" aria-label="上一张">‹</button>
+          <a id="viewerOriginal" class="grid h-10 w-16 place-items-center rounded-md border border-white/20 bg-white/10 text-[13px] font-extrabold text-white no-underline transition hover:-translate-y-0.5 hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" href="#" target="_blank" rel="noreferrer">原图</a>
+          <button id="nextPhoto" class="grid h-10 w-12 place-items-center rounded-md border border-white/20 bg-white/10 text-2xl font-black leading-none text-white transition hover:-translate-y-0.5 hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button" aria-label="下一张">›</button>
+        </div>
+      </div>
+    </section>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { CSS3DObject, CSS3DRenderer } from "three/addons/renderers/CSS3DRenderer.js";
+
+      const photoRoot = "./2026-6-7 杭州上城区领证"; // 定义原始照片根目录
+      const rawFiles = [
+        "DSC04778.JPG",
+        "DSC04781.JPG",
+        "DSC04782.JPG",
+        "DSC04784.JPG",
+        "DSC04787.JPG",
+        "DSC04788.JPG",
+        "DSC04791.JPG",
+        "DSC04794.JPG",
+        "DSC04799.JPG",
+        "DSC04803.JPG",
+        "DSC04806.JPG",
+        "DSC04807.JPG",
+        "DSC04815.JPG",
+        "DSC04818.JPG",
+        "DSC04820.JPG",
+        "DSC04822.JPG",
+        "DSC04826.JPG",
+        "DSC04832.JPG",
+        "DSC04837.JPG",
+        "DSC04840.JPG",
+        "DSC04842.JPG",
+        "DSC04847.JPG",
+        "DSC04848.JPG",
+        "DSC04852.JPG",
+        "DSC04857.JPG",
+        "DSC04858.JPG",
+        "DSC04863.JPG",
+        "DSC04870.JPG",
+        "DSC04873.JPG",
+        "DSC04876.JPG",
+        "DSC04892.JPG",
+        "DSC04895.JPG",
+        "DSC04899.JPG",
+        "DSC04903.JPG",
+        "DSC04911.JPG",
+        "DSC04913.JPG",
+        "DSC04919.JPG",
+        "DSC04920.JPG",
+        "DSC04922.JPG",
+        "DSC04927.JPG",
+        "DSC04929.JPG",
+        "DSC04931.JPG",
+        "DSC04935.JPG",
+        "DSC04939.JPG",
+        "DSC04950.JPG",
+        "DSC04951.JPG",
+        "DSC04960.JPG",
+        "DSC04962.JPG",
+        "DSC04968.JPG",
+        "DSC04972.JPG",
+        "DSC04978.JPG",
+        "DSC04981.JPG",
+        "DSC04983.JPG",
+        "DSC04984.JPG",
+        "DSC04986.JPG",
+        "DSC04989.JPG",
+        "DSC04991.JPG",
+        "DSC04994.JPG",
+        "DSC04998.JPG",
+        "DSC05000.JPG",
+        "DSC05003.JPG",
+        "DSC05008.JPG",
+        "DSC05013.JPG",
+        "DSC05018.JPG",
+        "DSC05019.JPG",
+        "DSC05022.JPG",
+        "DSC05023.JPG",
+        "DSC05026.JPG",
+        "DSC05030.JPG",
+        "DSC05036.JPG",
+        "DSC05040.JPG",
+        "DSC05047.JPG",
+        "DSC05048.JPG",
+        "DSC05059.JPG",
+        "DSC05065.JPG",
+        "DSC05070.JPG",
+        "DSC05076.JPG",
+        "DSC05082.JPG",
+        "DSC05091.JPG",
+        "DSC05094.JPG",
+        "DSC05100.JPG",
+        "DSC05102.JPG",
+        "DSC05103.JPG",
+        "DSC05106.JPG",
+        "DSC05112.JPG",
+        "DSC05124.JPG",
+        "DSC05129.JPG",
+        "DSC05134.JPG",
+        "DSC05137.JPG",
+        "DSC05141.JPG",
+        "DSC05143.JPG",
+        "DSC05144.JPG",
+        "DSC05146.JPG",
+        "DSC05149.JPG",
+        "DSC05158.JPG",
+        "DSC05159.JPG",
+        "DSC05162.JPG",
+        "DSC05168.JPG",
+        "DSC05170.JPG",
+        "DSC05175.JPG",
+        "DSC05176.JPG",
+        "DSC05177.JPG",
+        "DSC05182.JPG",
+      ];
+      const retouchedFiles = [
+        "DSC04803.jpg",
+        "DSC04836.jpg",
+        "DSC04843.jpg",
+        "DSC04847.jpg",
+        "DSC04861.jpg",
+        "DSC04889.png",
+        "DSC04893.png",
+        "DSC04911.png",
+        "DSC04914.png",
+        "DSC04919.png",
+        "DSC04931.png",
+        "DSC04936.png",
+        "DSC04940.png",
+        "DSC04953.png",
+        "DSC04958.png",
+        "DSC05024.jpg",
+        "DSC05028.jpg",
+        "DSC05068.jpg",
+        "DSC05145.jpg",
+        "DSC05187.jpg",
+      ];
+
+      const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // 使用黄金角让照片分布更均匀
+      const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)"); // 读取系统动效偏好
+      const stage = document.querySelector("#stage"); // 获取 3D 场景容器
+      const viewer = document.querySelector("#viewer"); // 获取照片预览弹层
+      const viewerImage = document.querySelector("#viewerImage"); // 获取预览图片节点
+      const viewerOriginal = document.querySelector("#viewerOriginal"); // 获取原图链接节点
+      const modeButtons = Array.from(document.querySelectorAll(".mode-button")); // 转换布局按钮列表便于遍历
+      const autoButton = document.querySelector("#autoButton"); // 获取自动旋转按钮
+
+      const scene = new THREE.Scene(); // 创建 Three.js 场景
+      const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 1, 5000); // 创建透视相机
+      const renderer = new CSS3DRenderer(); // 创建 CSS3D 渲染器承载照片 DOM
+      const controls = new OrbitControls(camera, renderer.domElement); // 创建拖拽旋转控制器
+      const photoGroup = new THREE.Group(); // 创建照片总分组用于整体旋转
+      const objects = []; // 保存每张照片对应的 3D 对象
+      let targetLayouts = {}; // 保存每套布局的目标位置
+      let activeLayout = "heart"; // 记录当前布局状态
+      let currentIndex = 0; // 记录当前预览照片索引
+      let viewerOpen = false; // 记录预览弹层打开状态
+      let autoSpinEnabled = reducedMotionQuery.matches ? false : true; // 根据系统动效偏好设置自动旋转
+      let pointerStart = { x: 0, y: 0 }; // 记录指针起点用于区分拖拽和点击
+      let pointerMoved = false; // 记录当前指针是否已经拖动
+      let highResToken = 0; // 记录高清图加载批次避免旧请求覆盖新预览
+
+      const photos = retouchedFiles
+        .map((fileName, index) => buildPhotoData(fileName, "retouched", index))
+        .concat(rawFiles.map((fileName, index) => buildPhotoData(fileName, "raw", index))); // 合并精修和底片数据
+
+      initScene(); // 初始化 3D 场景
+      createPhotoObjects(); // 创建所有照片对象
+      rebuildLayouts(); // 计算初始布局目标
+      applyLayout("heart"); // 默认进入爱心布局
+      animate(); // 启动逐帧动画
+
+      function buildPhotoData(fileName, kind, localIndex) {
+        // 根据文件名生成页面所需的照片数据
+        const folderName = kind === "retouched" ? "精修" : "底片"; // 根据照片类型定位原始目录
+        const baseName = fileName.replace(/\.[^.]+$/, ""); // 去掉扩展名以拼接缩略图文件名
+        const label = kind === "retouched" ? `精修 ${baseName}` : `底片 ${baseName}`; // 根据照片类型生成显示名称
+        return {
+          kind,
+          localIndex,
+          name: fileName,
+          label,
+          thumb: `assets/photo-wall/thumbs/${kind}-${baseName}.jpg`,
+          original: `${photoRoot}/${folderName}/${fileName}`,
+        };
+      }
+
+      function initScene() {
+        // 初始化相机、渲染器和控制器
+        camera.position.set(0, 0, window.innerWidth < 760 ? 1880 : 1420); // 根据屏幕宽度设置初始相机距离
+        scene.add(photoGroup); // 把照片分组加入场景
+        renderer.setSize(window.innerWidth, window.innerHeight); // 设置渲染器尺寸
+        renderer.domElement.style.position = "absolute"; // 固定渲染层定位
+        renderer.domElement.style.inset = "0"; // 让渲染层铺满舞台
+        stage.appendChild(renderer.domElement); // 挂载渲染器到页面
+        controls.enableDamping = true; // 开启阻尼让拖拽更顺滑
+        controls.dampingFactor = 0.06; // 设置阻尼强度
+        controls.rotateSpeed = 0.42; // 设置拖拽旋转速度
+        controls.minDistance = 760; // 限制最近观察距离
+        controls.maxDistance = 2600; // 限制最远观察距离
+        controls.enablePan = false; // 关闭平移避免照片墙偏出视口
+        controls.autoRotate = false; // 自动旋转交给照片分组控制
+        window.addEventListener("resize", handleResize); // 监听窗口变化刷新布局
+        renderer.domElement.addEventListener("pointerdown", handlePointerDown); // 记录指针按下位置
+        renderer.domElement.addEventListener("pointermove", handlePointerMove); // 记录拖拽移动状态
+      }
+
+      function createPhotoObjects() {
+        // 根据照片数据创建 CSS3DObject
+        photos.forEach((photo, index) => {
+          const card = createPhotoCard(photo, index); // 创建单张照片卡片
+          const object = new CSS3DObject(card); // 把 DOM 卡片转换为 3D 对象
+          const introTarget = createIntroTarget(index, photos.length); // 生成开场分布位置
+          object.position.copy(introTarget.position); // 初始化照片位置
+          object.quaternion.copy(introTarget.quaternion); // 初始化照片朝向
+          photoGroup.add(object); // 添加照片对象到总分组
+          objects.push(object); // 保存对象以便逐帧插值
+        });
+      }
+
+      function createPhotoCard(photo, index) {
+        // 创建单张照片的 DOM 卡片
+        const card = document.createElement("button"); // 使用按钮承载照片以支持键盘访问
+        card.className = "photo-card"; // 设置照片卡片样式类
+        card.type = "button"; // 指定按钮类型避免默认提交行为
+        card.dataset.kind = photo.kind; // 写入照片类型供样式区分
+        card.dataset.index = String(index); // 写入索引用于调试和定位
+        card.setAttribute("aria-label", `${photo.label} 预览`); // 设置无障碍名称
+
+        const img = document.createElement("img"); // 创建缩略图节点
+        img.src = photo.thumb; // 设置缩略图地址
+        img.alt = `${photo.label}，2026年6月7日杭州上城区领证`; // 设置图片替代文本
+        img.loading = index < 28 ? "eager" : "lazy"; // 前排照片优先加载，其余延迟加载
+        img.decoding = "async"; // 让浏览器异步解码图片
+        img.addEventListener("error", () => {
+          card.classList.add("is-missing"); // 图片缺失时标记卡片状态
+          card.textContent = "图片未加载"; // 图片缺失时展示通用兜底文案
+        });
+
+        card.appendChild(img); // 把缩略图加入卡片
+        card.addEventListener("click", (event) => {
+          event.stopPropagation(); // 阻止点击继续冒泡到控制器
+          if (pointerMoved) return; // 拖拽后不触发照片预览
+          openViewer(index); // 打开当前照片预览
+        });
+        return card;
+      }
+
+      function createIntroTarget(index, total) {
+        // 生成球面开场目标位置
+        const safeTotal = total > 0 ? total : 1; // 防止照片数量为 0 时出现除零
+        const y = 1 - (index / (safeTotal - 1 || 1)) * 2; // 把索引转换到球面纵向范围
+        const radiusAtY = Math.sqrt(1 - y * y); // 根据纵向位置计算横向半径
+        const theta = GOLDEN_ANGLE * index; // 使用黄金角分散照片角度
+        const radius = 920; // 设置开场球面半径
+        const x = Math.cos(theta) * radiusAtY * radius; // 计算球面 x 坐标
+        const z = Math.sin(theta) * radiusAtY * radius; // 计算球面 z 坐标
+        return createFacingTarget(x, y * radius * 0.72, z, x * 2, y * radius * 0.72, z * 2, 0);
+      }
+
+      function rebuildLayouts() {
+        // 根据当前视口重新计算全部布局
+        targetLayouts = {
+          heart: photos.map((photo, index) => buildHeartTarget(photo, index, photos.length)),
+          orbit: photos.map((photo, index) => buildOrbitTarget(photo, index)),
+          certificate: photos.map((photo, index) => buildCertificateTarget(photo, index)),
+        }; // 保存三套布局目标
+      }
+
+      function getSceneScale() {
+        // 根据屏幕宽度压缩或放大 3D 布局
+        if (window.innerWidth < 560) return 0.58; // 小屏使用更紧凑的场景比例
+        if (window.innerWidth < 900) return 0.76; // 中屏使用适中场景比例
+        return 1; // 大屏使用完整场景比例
+      }
+
+      function buildHeartTarget(photo, index, total) {
+        // 生成爱心布局中的照片位置
+        const scale = getSceneScale(); // 获取当前视口缩放比例
+        const safeTotal = total > 0 ? total : 1; // 防止照片数量为 0 时出现除零
+        const spreadIndex = (index * 37) % safeTotal; // 打散精修和底片在爱心上的分布
+        const t = (spreadIndex / safeTotal) * Math.PI * 2; // 把索引转换成心形曲线角度
+        const x = 16 * Math.pow(Math.sin(t), 3); // 计算心形横坐标
+        const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t); // 计算心形纵坐标
+        const layer = (index % 7) - 3; // 让照片产生前后层次
+        const z = layer * 74 + Math.sin(index * 0.67) * 42; // 计算照片景深位置
+        const tilt = ((index % 9) - 4) * 0.025; // 生成轻微旋转角度
+        const sizePull = photo.kind === "retouched" ? 0.92 : 1; // 精修图略微靠近中心突出重点
+        return createFlatTarget(x * 34 * scale * sizePull, y * 35 * scale - 20 * scale, z * scale, 0, tilt);
+      }
+
+      function buildOrbitTarget(photo, index) {
+        // 生成星环布局中的照片位置
+        const scale = getSceneScale(); // 获取当前视口缩放比例
+        const angle = index * GOLDEN_ANGLE; // 用黄金角计算环形角度
+        const radius = photo.kind === "retouched" ? 620 : 900 + (index % 4) * 72; // 精修图在内环，底片在外环
+        const y = ((index % 31) - 15) * 42 * scale; // 把照片分布到纵向螺旋
+        const x = Math.sin(angle) * radius * scale; // 计算环形 x 坐标
+        const z = Math.cos(angle) * radius * scale; // 计算环形 z 坐标
+        const tilt = ((index % 5) - 2) * 0.035; // 生成轻微旋转角度
+        return createFacingTarget(x, y, z, x * 2, y, z * 2, tilt);
+      }
+
+      function buildCertificateTarget(photo, index) {
+        // 生成婚书布局中的照片位置
+        const scale = getSceneScale(); // 获取当前视口缩放比例
+        const columns = window.innerWidth < 560 ? 7 : 13; // 根据屏幕宽度决定列数
+        const leftColumns = Math.ceil(columns / 2); // 计算左页列数
+        const rightColumns = columns - leftColumns; // 计算右页列数
+        const row = Math.floor(index / columns); // 把索引转换成行号
+        const col = index % columns; // 把索引转换成列号
+        const isLeftPage = col < leftColumns; // 判断照片落在婚书左页还是右页
+        const pageSide = isLeftPage ? -1 : 1; // 左页为负，右页为正
+        const pageCol = isLeftPage ? col : col - leftColumns; // 换算当前页内部列号
+        const pageColumns = isLeftPage ? leftColumns : rightColumns; // 获取当前页列数
+        const centerCol = (pageColumns - 1) / 2; // 计算当前页的水平中心
+        const rowOffset = window.innerWidth < 560 ? 8.5 : 4.6; // 根据屏幕宽度调整纵向中心
+        const x = pageSide * 255 * scale + (pageCol - centerCol) * 138 * scale; // 计算婚书页内 x 坐标
+        const y = (rowOffset - row) * 102 * scale; // 计算婚书页内 y 坐标
+        const z = -120 * scale + Math.sin(row * 0.55) * 24 * scale; // 计算婚书页内景深
+        const tilt = ((index % 3) - 1) * 0.018; // 生成轻微错落角度
+        return createFlatTarget(x, y, z, pageSide * -0.24, tilt);
+      }
+
+      function createFlatTarget(x, y, z, rotateY, rotateZ) {
+        // 创建面向镜头的平面布局目标
+        const target = new THREE.Object3D(); // 创建目标对象
+        target.position.set(x, y, z); // 设置目标位置
+        target.rotation.set(0, rotateY, rotateZ); // 设置目标朝向
+        return target;
+      }
+
+      function createFacingTarget(x, y, z, lookX, lookY, lookZ, rotateZ) {
+        // 创建向外环绕的布局目标
+        const target = new THREE.Object3D(); // 创建目标对象
+        target.position.set(x, y, z); // 设置目标位置
+        target.lookAt(lookX, lookY, lookZ); // 让照片朝向指定方向
+        target.rotateZ(rotateZ); // 添加轻微旋转增强自然感
+        return target;
+      }
+
+      function applyLayout(layoutName) {
+        // 切换照片墙布局
+        if (!targetLayouts[layoutName]) return; // 布局不存在时直接兜底返回
+        activeLayout = layoutName; // 保存当前布局状态
+        modeButtons.forEach((button) => {
+          button.classList.toggle("is-active", button.dataset.layout === layoutName); // 同步按钮选中状态
+        });
+      }
+
+      function updateObjects() {
+        // 逐帧把照片插值到当前布局目标
+        const targets = targetLayouts[activeLayout] || []; // 获取当前布局目标并兜底为空数组
+        const damping = activeLayout === "certificate" ? 0.095 : 0.075; // 根据布局复杂度调整收敛速度
+        objects.forEach((object, index) => {
+          const target = targets[index]; // 读取当前照片目标
+          if (!target) return; // 目标缺失时跳过当前照片
+          object.position.lerp(target.position, damping); // 平滑插值照片位置
+          object.quaternion.slerp(target.quaternion, damping); // 平滑插值照片朝向
+        });
+      }
+
+      function animate() {
+        // 启动并维持照片墙动画循环
+        requestAnimationFrame(animate); // 请求下一帧动画
+        updateObjects(); // 更新照片位置和朝向
+        if (autoSpinEnabled && !viewerOpen) {
+          photoGroup.rotation.y += activeLayout === "certificate" ? 0.0009 : 0.0017; // 预览未打开时缓慢旋转照片墙
+          photoGroup.rotation.x += (Math.sin(Date.now() * 0.00022) * 0.035 - photoGroup.rotation.x) * 0.025; // 添加轻微呼吸起伏
+        }
+        controls.update(); // 更新拖拽控制器阻尼
+        renderer.render(scene, camera); // 渲染当前帧
+      }
+
+      function handleResize() {
+        // 窗口尺寸变化时同步相机、渲染器和布局
+        const width = window.innerWidth; // 读取当前窗口宽度
+        const height = window.innerHeight; // 读取当前窗口高度
+        camera.aspect = width / height; // 更新相机宽高比
+        camera.position.z = width < 760 ? 1880 : 1420; // 根据屏幕宽度调整相机距离
+        camera.updateProjectionMatrix(); // 应用相机投影变化
+        renderer.setSize(width, height); // 更新渲染尺寸
+        rebuildLayouts(); // 重新计算响应式布局目标
+      }
+
+      function handlePointerDown(event) {
+        // 记录指针按下位置
+        pointerStart = { x: event.clientX, y: event.clientY }; // 保存拖拽起点
+        pointerMoved = false; // 重置拖拽状态
+      }
+
+      function handlePointerMove(event) {
+        // 根据移动距离判断是否拖拽
+        const distanceX = Math.abs(event.clientX - pointerStart.x); // 计算横向移动距离
+        const distanceY = Math.abs(event.clientY - pointerStart.y); // 计算纵向移动距离
+        if (distanceX + distanceY > 8) pointerMoved = true; // 超过阈值时标记为拖拽
+      }
+
+      function openViewer(index) {
+        // 打开指定照片的预览弹层
+        if (!photos.length) return; // 没有照片时直接返回
+        currentIndex = normalizeIndex(index); // 规范化预览索引
+        viewerOpen = true; // 标记预览弹层已打开
+        renderViewerPhoto(); // 渲染当前预览照片
+        viewer.classList.add("is-open"); // 显示预览弹层
+        viewer.setAttribute("aria-hidden", "false"); // 同步无障碍状态
+      }
+
+      function closeViewer() {
+        // 关闭照片预览弹层
+        viewerOpen = false; // 标记预览弹层已关闭
+        viewer.classList.remove("is-open"); // 隐藏预览弹层
+        viewer.setAttribute("aria-hidden", "true"); // 同步无障碍状态
+      }
+
+      function renderViewerPhoto() {
+        // 渲染当前索引对应的预览照片
+        const photo = photos[currentIndex]; // 读取当前照片数据
+        if (!photo) return; // 当前照片缺失时直接返回
+        const requestToken = highResToken + 1; // 生成当前高清加载批次
+        highResToken = requestToken; // 保存当前高清加载批次
+        viewerImage.src = photo.thumb; // 先显示缩略图保证放大动画立即出现
+        viewerImage.alt = photo.label; // 设置预览图片替代文本
+        viewerOriginal.href = photo.original; // 设置原图跳转地址
+        const highResImage = new Image(); // 创建高清图预加载对象
+        highResImage.onload = () => {
+          if (requestToken !== highResToken) return; // 旧请求完成时不覆盖当前预览
+          viewerImage.src = photo.original; // 高清图加载完成后替换预览图片
+        };
+        highResImage.src = photo.original; // 异步加载原始大图
+      }
+
+      function normalizeIndex(index) {
+        // 把任意索引转换到照片数组范围内
+        const total = photos.length; // 读取照片总数
+        if (total === 0) return 0; // 没有照片时返回 0 兜底
+        return ((index % total) + total) % total; // 处理负数和越界索引
+      }
+
+      function showRelativePhoto(offset) {
+        // 按偏移量切换预览照片
+        currentIndex = normalizeIndex(currentIndex + offset); // 更新当前预览索引
+        renderViewerPhoto(); // 渲染切换后的照片
+      }
+
+      modeButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          applyLayout(button.dataset.layout); // 点击按钮切换对应布局
+        });
+      });
+
+      autoButton.addEventListener("click", () => {
+        autoSpinEnabled = !autoSpinEnabled; // 切换自动旋转状态
+        autoButton.classList.toggle("is-active", autoSpinEnabled); // 同步按钮选中状态
+        autoButton.textContent = autoSpinEnabled ? "旋转" : "暂停"; // 同步按钮文字
+      });
+
+      document.querySelector("#closeViewer").addEventListener("click", closeViewer); // 点击关闭按钮关闭预览
+      document.querySelector("#prevPhoto").addEventListener("click", () => showRelativePhoto(-1)); // 点击上一张切换照片
+      document.querySelector("#nextPhoto").addEventListener("click", () => showRelativePhoto(1)); // 点击下一张切换照片
+      viewer.addEventListener("click", (event) => {
+        if (event.target === viewer) closeViewer(); // 点击遮罩区域关闭预览
+      });
+
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && viewerOpen) closeViewer(); // 按 Esc 关闭预览
+        if (event.key === "ArrowLeft" && viewerOpen) showRelativePhoto(-1); // 预览打开时按左键上一张
+        if (event.key === "ArrowRight" && viewerOpen) showRelativePhoto(1); // 预览打开时按右键下一张
+      });
+
+      if (!autoSpinEnabled) {
+        autoButton.classList.remove("is-active"); // 系统减少动态时关闭自动旋转按钮状态
+        autoButton.textContent = "暂停"; // 系统减少动态时同步按钮文字
+      }
+    </script>
+  </body>
 </html>
