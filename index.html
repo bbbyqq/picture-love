@@ -100,6 +100,11 @@
         bottom: 34px;
         width: max-content;
         max-width: calc(100vw - 56px);
+        pointer-events: none;
+      }
+
+      .control-panel button {
+        pointer-events: auto;
       }
 
       .seal {
@@ -176,7 +181,10 @@
           filter 180ms ease,
           opacity 180ms ease,
           box-shadow 180ms ease;
+        cursor: pointer;
+        touch-action: manipulation;
         user-select: none;
+        -webkit-tap-highlight-color: transparent;
       }
 
       .photo-card[data-kind="retouched"] {
@@ -352,7 +360,7 @@
         <p class="mt-3 hidden max-w-[430px] text-[15px] leading-7 text-white/75 sm:block">把这一天做成一面会旋转的照片墙，精修与底片一起收藏同一个心跳瞬间。</p>
       </section>
 
-      <aside class="control-panel pointer-events-auto rounded-lg border border-white/20 bg-[#1d090c]/70 p-2 shadow-2xl shadow-black/30 backdrop-blur-xl" aria-label="照片墙控制">
+      <aside class="control-panel rounded-lg border border-white/20 bg-[#1d090c]/70 p-2 shadow-2xl shadow-black/30 backdrop-blur-xl" aria-label="照片墙控制">
         <div class="grid grid-cols-4 gap-1.5" aria-label="布局切换">
           <button class="mode-button is-active h-9 rounded-md border border-white/20 bg-white/10 px-3 text-[13px] font-extrabold text-white transition hover:-translate-y-0.5 hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button" data-layout="heart">爱心</button>
           <button class="mode-button h-9 rounded-md border border-white/20 bg-white/10 px-3 text-[13px] font-extrabold text-white transition hover:-translate-y-0.5 hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button" data-layout="orbit">星环</button>
@@ -514,6 +522,7 @@
       ];
 
       const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // 使用黄金角让照片分布更均匀
+      const TOUCH_TAP_DISTANCE = 30; // 设置触摸轻点允许的最大移动距离
       const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)"); // 读取系统动效偏好
       const stage = document.querySelector("#stage"); // 获取 3D 场景容器
       const viewer = document.querySelector("#viewer"); // 获取照片预览弹层
@@ -536,9 +545,12 @@
       let pointerStart = { x: 0, y: 0 }; // 记录指针起点用于区分拖拽和点击
       let pointerMoved = false; // 记录当前指针是否已经拖动
       let pointerTracking = false; // 记录当前是否处于按下后的拖拽跟踪
+      let activePointerType = "mouse"; // 记录当前指针类型用于区分鼠标和触摸阈值
       let pointerDownPhotoIndex = -1; // 记录按下时命中的照片索引，避免 PC 指针捕获丢失目标
+      let touchTracking = false; // 记录当前是否正在跟踪触摸轻点
+      let touchMoved = false; // 记录触摸过程中是否已经超过轻点阈值
+      let touchStart = { x: 0, y: 0, index: -1 }; // 记录触摸起点和起点命中的照片索引
       let lastOpenAt = 0; // 记录最近一次打开预览的时间避免重复触发
-      let highResToken = 0; // 记录高清图加载批次避免旧请求覆盖新预览
 
       const photos = retouchedFiles
         .map((fileName, index) => buildPhotoData(fileName, "retouched", index))
@@ -585,6 +597,10 @@
         renderer.domElement.addEventListener("pointermove", handlePointerMove, true); // 捕获阶段记录拖拽移动状态
         renderer.domElement.addEventListener("pointerup", handleRendererPointerUp, true); // 捕获阶段优先处理 PC 点击预览
         renderer.domElement.addEventListener("click", handleRendererClick, true); // 捕获阶段保留点击兜底
+        renderer.domElement.addEventListener("touchstart", handleTouchStart, { capture: true, passive: true }); // 捕获触摸起点用于 H5 轻点兜底
+        renderer.domElement.addEventListener("touchmove", handleTouchMove, { capture: true, passive: true }); // 捕获触摸移动用于区分拖拽和轻点
+        renderer.domElement.addEventListener("touchend", handleTouchEnd, { capture: true, passive: false }); // 捕获触摸结束用于移动端稳定打开预览
+        renderer.domElement.addEventListener("touchcancel", handleTouchCancel, { capture: true, passive: true }); // 触摸被系统取消时清理轻点状态
         window.addEventListener("pointerup", handlePointerUp); // 指针抬起后停止拖拽跟踪
       }
 
@@ -776,6 +792,7 @@
       function handlePointerDown(event) {
         // 记录指针按下位置
         pointerTracking = true; // 开始跟踪本次指针动作
+        activePointerType = event.pointerType || "mouse"; // 保存当前指针类型用于后续拖拽判断
         pointerStart = { x: event.clientX, y: event.clientY }; // 保存拖拽起点
         pointerMoved = false; // 重置拖拽状态
         pointerDownPhotoIndex = getPhotoIndexFromEvent(event); // 记录按下时的照片索引用于 PC 指针捕获兜底
@@ -786,7 +803,9 @@
         if (!pointerTracking) return; // 未按下时不把鼠标移动误判为拖拽
         const distanceX = Math.abs(event.clientX - pointerStart.x); // 计算横向移动距离
         const distanceY = Math.abs(event.clientY - pointerStart.y); // 计算纵向移动距离
-        if (distanceX + distanceY > 8) pointerMoved = true; // 超过阈值时标记为拖拽
+        const dragDistance = Math.hypot(distanceX, distanceY); // 合成实际移动距离避免触摸轻微斜向抖动被放大
+        const dragThreshold = activePointerType === "touch" ? 24 : 8; // 触摸端放宽阈值避免轻点被误判为拖拽
+        if (dragDistance > dragThreshold) pointerMoved = true; // 超过阈值时标记为拖拽
       }
 
       function handlePointerUp() {
@@ -795,14 +814,85 @@
         pointerDownPhotoIndex = -1; // 清理按下时记录的照片索引
       }
 
-      function getPhotoIndexFromEvent(event) {
-        // 从事件目标向上查找照片卡片索引
-        const target = event.target; // 读取事件触发节点
+      function handleTouchStart(event) {
+        // 记录触摸起点，给移动端补一条不依赖 pointer/click 的轻点路径
+        if (event.touches.length !== 1) {
+          touchTracking = false; // 多指触摸交给浏览器和控制器处理
+          return;
+        }
+        const touch = event.touches[0]; // 读取当前唯一触点
+        activePointerType = "touch"; // 标记当前输入类型为触摸
+        touchTracking = true; // 开始跟踪本次触摸轻点
+        touchMoved = false; // 重置触摸移动状态
+        pointerMoved = false; // 同步重置指针拖拽状态避免旧状态阻止轻点
+        touchStart = {
+          x: touch.clientX,
+          y: touch.clientY,
+          index: getPhotoIndexFromPoint(touch.clientX, touch.clientY),
+        }; // 保存起点坐标和照片索引
+        if (touchStart.index < 0) touchStart.index = getPhotoIndexFromTarget(event.target); // 坐标命中失败时使用事件目标兜底
+      }
+
+      function handleTouchMove(event) {
+        // 根据触摸移动距离判断是否已经变成拖拽
+        if (!touchTracking || event.touches.length !== 1) return; // 未跟踪或多指触摸时不处理轻点状态
+        const touch = event.touches[0]; // 读取当前触点
+        const distanceX = Math.abs(touch.clientX - touchStart.x); // 计算触摸横向偏移
+        const distanceY = Math.abs(touch.clientY - touchStart.y); // 计算触摸纵向偏移
+        const dragDistance = Math.hypot(distanceX, distanceY); // 合成触摸实际移动距离
+        if (dragDistance > TOUCH_TAP_DISTANCE) {
+          touchMoved = true; // 超过轻点阈值后标记为拖拽
+          pointerMoved = true; // 同步阻止 pointer/click 兜底误打开预览
+        }
+      }
+
+      function handleTouchEnd(event) {
+        // 触摸结束时稳定识别轻点照片，兼容 H5 容器丢失 pointerup/click 的情况
+        if (!touchTracking || event.changedTouches.length < 1) return; // 没有可用触点时直接退出
+        const touch = event.changedTouches[0]; // 读取结束触点
+        const distanceX = Math.abs(touch.clientX - touchStart.x); // 计算结束横向偏移
+        const distanceY = Math.abs(touch.clientY - touchStart.y); // 计算结束纵向偏移
+        const dragDistance = Math.hypot(distanceX, distanceY); // 合成触摸结束移动距离
+        const endIndex = getPhotoIndexFromPoint(touch.clientX, touch.clientY); // 按结束坐标重新命中照片
+        const index = endIndex >= 0 ? endIndex : touchStart.index; // 结束命中失败时使用按下时照片兜底
+        touchTracking = false; // 结束本次触摸跟踪
+        if (index < 0) return; // 没有触到照片时不打开预览
+        if (touchMoved || dragDistance > TOUCH_TAP_DISTANCE) return; // 拖拽旋转时不打开预览
+        event.preventDefault(); // 阻止移动端合成 click 造成重复触发
+        event.stopPropagation(); // 阻止触摸结束继续冒泡到控制器
+        requestOpenViewer(index); // 打开触摸轻点命中的照片预览
+      }
+
+      function handleTouchCancel() {
+        // 系统取消触摸时清理本次轻点状态
+        touchTracking = false; // 停止跟踪本次触摸
+        touchMoved = false; // 清理触摸移动状态
+      }
+
+      function getPhotoIndexFromTarget(target) {
+        // 从指定节点向上查找照片卡片索引
         if (!target || !target.closest) return -1; // 事件目标不可查询时返回无效索引
         const card = target.closest(".photo-card"); // 查找最近的照片卡片
         if (!card) return -1; // 没有点到照片时返回无效索引
         const index = Number(card.dataset.index); // 将 DOM 字符串索引转换为数字
         return Number.isFinite(index) ? index : -1; // 索引有效时返回，否则兜底为无效索引
+      }
+
+      function getPhotoIndexFromPoint(clientX, clientY) {
+        // 从屏幕坐标查找照片卡片，兼容移动端 3D transform 命中不稳定
+        const pointTargets = document.elementsFromPoint ? document.elementsFromPoint(clientX, clientY) : [document.elementFromPoint(clientX, clientY)]; // 读取坐标下的多层元素
+        for (const target of pointTargets) {
+          const index = getPhotoIndexFromTarget(target); // 尝试从当前层级查找照片索引
+          if (index >= 0) return index; // 找到照片时立即返回
+        }
+        return -1; // 所有层级都没有照片时返回无效索引
+      }
+
+      function getPhotoIndexFromEvent(event) {
+        // 从事件目标或坐标兜底查找照片卡片索引
+        const eventIndex = getPhotoIndexFromTarget(event.target); // 优先使用浏览器事件目标查找照片
+        if (eventIndex >= 0) return eventIndex; // 事件目标命中照片时直接返回
+        return getPhotoIndexFromPoint(event.clientX, event.clientY); // 返回坐标命中的照片索引或无效索引
       }
 
       function handleRendererPointerUp(event) {
@@ -857,17 +947,9 @@
         // 渲染当前索引对应的预览照片
         const photo = photos[currentIndex]; // 读取当前照片数据
         if (!photo) return; // 当前照片缺失时直接返回
-        const requestToken = highResToken + 1; // 生成当前高清加载批次
-        highResToken = requestToken; // 保存当前高清加载批次
-        viewerImage.src = photo.thumb; // 先显示缩略图保证放大动画立即出现
+        viewerImage.src = photo.thumb; // 使用压缩图预览避免超大原图解码失败
         viewerImage.alt = photo.label; // 设置预览图片替代文本
         viewerOriginal.href = photo.original; // 设置原图跳转地址
-        const highResImage = new Image(); // 创建高清图预加载对象
-        highResImage.onload = () => {
-          if (requestToken !== highResToken) return; // 旧请求完成时不覆盖当前预览
-          viewerImage.src = photo.original; // 高清图加载完成后替换预览图片
-        };
-        highResImage.src = photo.original; // 异步加载原始大图
       }
 
       function normalizeIndex(index) {
