@@ -477,6 +477,9 @@
       let autoSpinEnabled = reducedMotionQuery.matches ? false : true; // 根据系统动效偏好设置自动旋转
       let pointerStart = { x: 0, y: 0 }; // 记录指针起点用于区分拖拽和点击
       let pointerMoved = false; // 记录当前指针是否已经拖动
+      let pointerTracking = false; // 记录当前是否处于按下后的拖拽跟踪
+      let pointerDownPhotoIndex = -1; // 记录按下时命中的照片索引，避免 PC 指针捕获丢失目标
+      let lastOpenAt = 0; // 记录最近一次打开预览的时间避免重复触发
       let highResToken = 0; // 记录高清图加载批次避免旧请求覆盖新预览
 
       const photos = retouchedFiles
@@ -520,8 +523,11 @@
         controls.enablePan = false; // 关闭平移避免照片墙偏出视口
         controls.autoRotate = false; // 自动旋转交给照片分组控制
         window.addEventListener("resize", handleResize); // 监听窗口变化刷新布局
-        renderer.domElement.addEventListener("pointerdown", handlePointerDown); // 记录指针按下位置
-        renderer.domElement.addEventListener("pointermove", handlePointerMove); // 记录拖拽移动状态
+        renderer.domElement.addEventListener("pointerdown", handlePointerDown, true); // 捕获阶段记录指针按下位置
+        renderer.domElement.addEventListener("pointermove", handlePointerMove, true); // 捕获阶段记录拖拽移动状态
+        renderer.domElement.addEventListener("pointerup", handleRendererPointerUp, true); // 捕获阶段优先处理 PC 点击预览
+        renderer.domElement.addEventListener("click", handleRendererClick, true); // 捕获阶段保留点击兜底
+        window.addEventListener("pointerup", handlePointerUp); // 指针抬起后停止拖拽跟踪
       }
 
       function createPhotoObjects() {
@@ -557,10 +563,18 @@
         });
 
         card.appendChild(img); // 把缩略图加入卡片
+        card.addEventListener("pointerup", (event) => {
+          event.stopPropagation(); // 阻止抬起事件继续冒泡到控制器
+          pointerTracking = false; // 卡片内抬起时也结束拖拽跟踪
+          pointerDownPhotoIndex = -1; // 清理按下时记录的照片索引
+          if (pointerMoved) return; // 拖拽后不触发照片预览
+          requestOpenViewer(index); // 用指针抬起打开当前照片预览
+        });
         card.addEventListener("click", (event) => {
+          event.preventDefault(); // 阻止按钮默认点击造成重复行为
           event.stopPropagation(); // 阻止点击继续冒泡到控制器
           if (pointerMoved) return; // 拖拽后不触发照片预览
-          openViewer(index); // 打开当前照片预览
+          requestOpenViewer(index); // 保留键盘点击和浏览器点击兜底
         });
         return card;
       }
@@ -704,15 +718,65 @@
 
       function handlePointerDown(event) {
         // 记录指针按下位置
+        pointerTracking = true; // 开始跟踪本次指针动作
         pointerStart = { x: event.clientX, y: event.clientY }; // 保存拖拽起点
         pointerMoved = false; // 重置拖拽状态
+        pointerDownPhotoIndex = getPhotoIndexFromEvent(event); // 记录按下时的照片索引用于 PC 指针捕获兜底
       }
 
       function handlePointerMove(event) {
         // 根据移动距离判断是否拖拽
+        if (!pointerTracking) return; // 未按下时不把鼠标移动误判为拖拽
         const distanceX = Math.abs(event.clientX - pointerStart.x); // 计算横向移动距离
         const distanceY = Math.abs(event.clientY - pointerStart.y); // 计算纵向移动距离
         if (distanceX + distanceY > 8) pointerMoved = true; // 超过阈值时标记为拖拽
+      }
+
+      function handlePointerUp() {
+        // 指针抬起后结束拖拽跟踪
+        pointerTracking = false; // 停止跟踪本次指针动作
+        pointerDownPhotoIndex = -1; // 清理按下时记录的照片索引
+      }
+
+      function getPhotoIndexFromEvent(event) {
+        // 从事件目标向上查找照片卡片索引
+        const target = event.target; // 读取事件触发节点
+        if (!target || !target.closest) return -1; // 事件目标不可查询时返回无效索引
+        const card = target.closest(".photo-card"); // 查找最近的照片卡片
+        if (!card) return -1; // 没有点到照片时返回无效索引
+        const index = Number(card.dataset.index); // 将 DOM 字符串索引转换为数字
+        return Number.isFinite(index) ? index : -1; // 索引有效时返回，否则兜底为无效索引
+      }
+
+      function handleRendererPointerUp(event) {
+        // 在捕获阶段优先处理照片点击，避免 OrbitControls 抢掉 PC 鼠标事件
+        const eventIndex = getPhotoIndexFromEvent(event); // 获取抬起时命中的照片索引
+        const index = eventIndex >= 0 ? eventIndex : pointerDownPhotoIndex; // 使用按下时索引兜底 PC 指针捕获场景
+        pointerTracking = false; // 指针抬起后结束拖拽跟踪
+        pointerDownPhotoIndex = -1; // 清理按下时记录的照片索引
+        if (index < 0) return; // 没有点到照片时不处理
+        if (pointerMoved) return; // 发生拖拽时不打开预览
+        event.preventDefault(); // 阻止按钮默认行为避免重复触发
+        event.stopPropagation(); // 阻止事件继续交给 3D 控制器
+        requestOpenViewer(index); // 打开照片预览
+      }
+
+      function handleRendererClick(event) {
+        // 在捕获阶段保留 click 兜底，兼容桌面浏览器点击
+        const index = getPhotoIndexFromEvent(event); // 获取被点击照片索引
+        if (index < 0) return; // 没有点到照片时不处理
+        if (pointerMoved) return; // 发生拖拽时不打开预览
+        event.preventDefault(); // 阻止按钮默认行为避免重复触发
+        event.stopPropagation(); // 阻止事件继续交给 3D 控制器
+        requestOpenViewer(index); // 打开照片预览
+      }
+
+      function requestOpenViewer(index) {
+        // 防止 pointerup 和 click 连续触发两次打开
+        const now = performance.now(); // 读取当前时间用于去重
+        if (now - lastOpenAt < 160) return; // 短时间重复触发时直接忽略
+        lastOpenAt = now; // 记录本次打开时间
+        openViewer(index); // 打开指定照片预览
       }
 
       function openViewer(index) {
