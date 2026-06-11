@@ -21,8 +21,6 @@
           --deep-red: #24070c;
           --gold: #f3c56b;
           --jade: #0f7d7a;
-          --card-w: 164px;
-          --feature-w: 184px;
           --panel: rgba(29, 9, 12, 0.68);
       }
 
@@ -77,17 +75,6 @@
           mix-blend-mode: soft-light;
       }
 
-      .stage {
-          position: fixed;
-          inset: 0;
-          z-index: 2;
-      }
-
-      .stage > div {
-          position: absolute;
-          inset: 0;
-      }
-
       button.is-active {
           color: #26090b;
           background: linear-gradient(90deg, #f1bd57, #ffe4a7);
@@ -98,6 +85,8 @@
           position: fixed;
           right: 34px;
           bottom: 34px;
+
+          z-index: 999999;
           width: max-content;
           max-width: calc(100vw - 56px);
           pointer-events: none;
@@ -143,91 +132,23 @@
           border-style: dashed;
       }
 
-      .photo-card {
-          position: relative;
-          width: var(--card-w);
-          aspect-ratio: 3 / 2;
-          overflow: hidden;
-          color: #fff;
-          background: #fff3e5;
-          border: 1px solid rgba(255, 240, 214, 0.48);
-          border-radius: 8px;
-          box-shadow:
-                  0 12px 28px rgba(0, 0, 0, 0.3),
-                  0 0 28px rgba(255, 202, 101, 0.12);
-          transform-style: preserve-3d;
-          transition:
-                  filter 180ms ease,
-                  opacity 180ms ease,
-                  box-shadow 180ms ease;
-          cursor: pointer;
-          touch-action: manipulation;
-          user-select: none;
-          -webkit-tap-highlight-color: transparent;
-      }
-
-      .photo-card[data-kind="retouched"] {
-          width: var(--feature-w);
-          aspect-ratio: 2 / 3;
-          border-color: rgba(255, 217, 138, 0.78);
-          box-shadow:
-                  0 18px 36px rgba(0, 0, 0, 0.34),
-                  0 0 42px rgba(255, 210, 118, 0.24);
-      }
-
-      .photo-card:hover {
-          filter: saturate(1.12) contrast(1.06);
-          box-shadow:
-                  0 22px 44px rgba(0, 0, 0, 0.38),
-                  0 0 46px rgba(255, 216, 133, 0.34);
-      }
-
-      .photo-card img {
-          display: block;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          pointer-events: none;
-      }
-
-      .photo-card::before {
-          position: absolute;
-          inset: 0;
-          content: "";
-          pointer-events: none;
-          background:
-                  linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 28%),
-                  linear-gradient(0deg, rgba(0, 0, 0, 0.48), transparent 48%);
-      }
-
-      .photo-card::after {
-          position: absolute;
-          inset: 7px;
-          content: "";
-          pointer-events: none;
-          border: 1px solid rgba(255, 255, 255, 0.24);
-          border-radius: 5px;
-      }
-
-      .photo-card.is-missing {
-          display: grid;
-          place-items: center;
-          padding: 16px;
-          color: #4d1017;
-          font-size: 13px;
-          font-weight: 900;
-          text-align: center;
-      }
-
       .viewer {
-          /* 用 isolation 创建独立层叠上下文，确保在移动端不被 3D transform 层遮住 */
-          isolation: isolate;
+          position: fixed;
+          left: 0;
+          top: 0;
+          right: 0;
+          bottom: 0;
+
+          z-index: 2147483647;
+
           pointer-events: none;
+
           background: rgba(11, 3, 5, 0);
+
           opacity: 0;
-          transition:
-                  opacity 180ms ease,
-                  background 180ms ease;
+
+          transform: none;
+          will-change: auto;
       }
 
       .viewer.is-open {
@@ -251,28 +172,17 @@
 
       /* 预览图片加载中状态 */
       #viewerImage {
+          /* 确保图片在移动端可见 */
           display: block;
           position: relative;
           z-index: 1;
-          will-change: transform; /* 强制独立合成层，避免父级 opacity 动画影响绘制 */
       }
 
       #viewerImage.loading {
           opacity: 0.4;
       }
 
-      @media (max-width: 900px) {
-          :root {
-              --card-w: 128px;
-              --feature-w: 140px;
-          }
-      }
-
       @media (max-width: 560px) and (hover: none) and (pointer: coarse) {
-          :root {
-              --card-w: 106px;
-              --feature-w: 118px;
-          }
 
           body::before {
               background-image:
@@ -347,8 +257,6 @@
   </aside>
 </header>
 
-<main id="stage" class="stage" aria-label="2026年6月7日杭州上城区领证3D照片墙"></main>
-
 <div class="seal" aria-hidden="true">领证<br />2026</div>
 
 <!-- 预览弹层放在 body 末尾，避免被任何 3D 层叠上下文影响 -->
@@ -367,7 +275,6 @@
 <script type="module">
   import * as THREE from "three";
   import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-  import { CSS3DObject, CSS3DRenderer } from "three/addons/renderers/CSS3DRenderer.js";
 
   // 全部使用 assets/photo-wall/thumbs/ 目录下的图片
   const retouchedFiles = [
@@ -499,9 +406,7 @@
   ];
 
   const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // 使用黄金角让照片分布更均匀
-  const TOUCH_TAP_DISTANCE = 30; // 设置触摸轻点允许的最大移动距离
   const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)"); // 读取系统动效偏好
-  const stage = document.querySelector("#stage"); // 获取 3D 场景容器
   const viewer = document.querySelector("#viewer"); // 获取照片预览弹层
   const viewerImage = document.querySelector("#viewerImage"); // 获取预览图片节点
   const modeButtons = Array.from(document.querySelectorAll(".mode-button")); // 转换布局按钮列表便于遍历
@@ -509,7 +414,8 @@
 
   const scene = new THREE.Scene(); // 创建 Three.js 场景
   const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 1, 5000); // 创建透视相机
-  const renderer = new CSS3DRenderer(); // 创建 CSS3D 渲染器承载照片 DOM
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); // 创建 WebGL 渲染器
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 限制像素比提高性能
   const controls = new OrbitControls(camera, renderer.domElement); // 创建拖拽旋转控制器
   const photoGroup = new THREE.Group(); // 创建照片总分组用于整体旋转
   const objects = []; // 保存每张照片对应的 3D 对象
@@ -518,15 +424,13 @@
   let currentIndex = 0; // 记录当前预览照片索引
   let viewerOpen = false; // 记录预览弹层打开状态
   let autoSpinEnabled = reducedMotionQuery.matches ? false : true; // 根据系统动效偏好设置自动旋转
-  let pointerStart = { x: 0, y: 0 }; // 记录指针起点用于区分拖拽和点击
-  let pointerMoved = false; // 记录当前指针是否已经拖动
-  let pointerTracking = false; // 记录当前是否处于按下后的拖拽跟踪
-  let activePointerType = "mouse"; // 记录当前指针类型用于区分鼠标和触摸阈值
-  let pointerDownPhotoIndex = -1; // 记录按下时命中的照片索引，避免 PC 指针捕获丢失目标
-  let touchTracking = false; // 记录当前是否正在跟踪触摸轻点
-  let touchMoved = false; // 记录触摸过程中是否已经超过轻点阈值
-  let touchStart = { x: 0, y: 0, index: -1 }; // 记录触摸起点和起点命中的照片索引
   let lastOpenAt = 0; // 记录最近一次打开预览的时间避免重复触发
+
+  const textureLoader = new THREE.TextureLoader(); // 纹理加载器用于从图片加载纹理
+
+  // Raycaster 用于命中检测照片点击
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
 
   // 合并精修和底片数据，统一使用 assets/photo-wall/thumbs/ 目录
   const photos = retouchedFiles
@@ -553,14 +457,82 @@
     };
   }
 
+  function getPhotoIndexFromPointer(clientX, clientY) {
+    // 从屏幕坐标通过 Raycaster 检测命中哪张照片
+    pointer.x = (clientX / window.innerWidth) * 2 - 1;
+    pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const intersects = raycaster.intersectObjects(objects);
+    if (intersects.length > 0) {
+      const index = intersects[0].object.userData.photoIndex;
+      return index !== undefined ? index : -1;
+    }
+    return -1;
+  }
+
+  function initInteraction() {
+    // 初始化基于 Raycaster 的交互事件
+    const canvas = renderer.domElement;
+    let ptrStart = { x: 0, y: 0 };
+    let ptrMoved = false;
+
+    canvas.addEventListener("pointerdown", (e) => {
+      ptrStart = { x: e.clientX, y: e.clientY };
+      ptrMoved = false;
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      if (Math.hypot(e.clientX - ptrStart.x, e.clientY - ptrStart.y) > 8) {
+        ptrMoved = true;
+      }
+    });
+
+    canvas.addEventListener("pointerup", (e) => {
+      if (ptrMoved) return;
+      const index = getPhotoIndexFromPointer(e.clientX, e.clientY);
+      if (index >= 0) requestOpenViewer(index);
+    });
+
+    canvas.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) return;
+      ptrStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      ptrMoved = false;
+    }, { passive: true });
+
+    canvas.addEventListener("touchmove", (e) => {
+      if (e.touches.length !== 1) return;
+      if (Math.hypot(e.touches[0].clientX - ptrStart.x, e.touches[0].clientY - ptrStart.y) > 30) {
+        ptrMoved = true;
+      }
+    }, { passive: true });
+
+    canvas.addEventListener("touchend", (e) => {
+      if (e.changedTouches.length < 1 || ptrMoved) return;
+      const touch = e.changedTouches[0];
+      const index = getPhotoIndexFromPointer(touch.clientX, touch.clientY);
+      if (index >= 0) {
+        e.preventDefault();
+        requestOpenViewer(index);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener("touchcancel", () => {
+      ptrMoved = true;
+    }, { passive: true });
+  }
+
   function initScene() {
     // 初始化相机、渲染器和控制器
     camera.position.set(0, 0, window.innerWidth < 760 ? 1880 : 1420); // 根据屏幕宽度设置初始相机距离
     scene.add(photoGroup); // 把照片分组加入场景
-    renderer.setSize(window.innerWidth, window.innerHeight); // 设置渲染器尺寸
-    renderer.domElement.style.position = "absolute"; // 固定渲染层定位
-    renderer.domElement.style.inset = "0"; // 让渲染层铺满舞台
-    stage.appendChild(renderer.domElement); // 挂载渲染器到页面
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.domElement.style.position = "fixed";
+    renderer.domElement.style.left = "0";
+    renderer.domElement.style.top = "0";
+    renderer.domElement.style.width = "100vw";
+    renderer.domElement.style.height = "100vh";
+    renderer.domElement.style.zIndex = "2";
+    document.body.appendChild(renderer.domElement);
     controls.enableDamping = true; // 开启阻尼让拖拽更顺滑
     controls.dampingFactor = 0.06; // 设置阻尼强度
     controls.rotateSpeed = 0.42; // 设置拖拽旋转速度
@@ -569,63 +541,49 @@
     controls.enablePan = false; // 关闭平移避免照片墙偏出视口
     controls.autoRotate = false; // 自动旋转交给照片分组控制
     window.addEventListener("resize", handleResize); // 监听窗口变化刷新布局
-    renderer.domElement.addEventListener("pointerdown", handlePointerDown, true); // 捕获阶段记录指针按下位置
-    renderer.domElement.addEventListener("pointermove", handlePointerMove, true); // 捕获阶段记录拖拽移动状态
-    renderer.domElement.addEventListener("pointerup", handleRendererPointerUp, true); // 捕获阶段优先处理 PC 点击预览
-    renderer.domElement.addEventListener("click", handleRendererClick, true); // 捕获阶段保留点击兜底
-    renderer.domElement.addEventListener("touchstart", handleTouchStart, { capture: true, passive: true }); // 捕获触摸起点用于 H5 轻点兜底
-    renderer.domElement.addEventListener("touchmove", handleTouchMove, { capture: true, passive: true }); // 捕获触摸移动用于区分拖拽和轻点
-    renderer.domElement.addEventListener("touchend", handleTouchEnd, { capture: true, passive: false }); // 捕获触摸结束用于移动端稳定打开预览
-    renderer.domElement.addEventListener("touchcancel", handleTouchCancel, { capture: true, passive: true }); // 触摸被系统取消时清理轻点状态
-    window.addEventListener("pointerup", handlePointerUp); // 指针抬起后停止拖拽跟踪
+    initInteraction(); // 初始化基于 Raycaster 的交互事件
   }
 
   function createPhotoObjects() {
-    // 根据照片数据创建 CSS3DObject
+    // 根据照片数据创建网格纹理平面
+    const layoutScale = getSceneScale(); // 获取当前视口缩放比例，同步缩放卡片尺寸
     photos.forEach((photo, index) => {
-      const card = createPhotoCard(photo, index); // 创建单张照片卡片
-      const object = new CSS3DObject(card); // 把 DOM 卡片转换为 3D 对象
+      const isFeature = photo.kind === "retouched"; // 精修图使用更大尺寸
+      const cardW = (isFeature ? 184 : 164) * layoutScale; // 卡片宽度按布局比例缩放
+      const cardH = (isFeature ? 276 : Math.round(164 * 2 / 3)) * layoutScale; // 卡片高度按布局比例缩放
+
+      const texture = textureLoader.load(photo.thumb, (tex) => {
+        // 图片加载后根据实际宽高比调整平面几何，避免拉伸
+        const imgAspect = tex.image.width / tex.image.height; // 图片实际宽高比
+        const planeAspect = cardW / cardH; // 当前平面宽高比
+        if (Math.abs(imgAspect - planeAspect) > 0.01) {
+          // 宽高比差异超过阈值时调整几何尺寸
+          const area = cardW * cardH; // 保持面积不变
+          const newW = Math.sqrt(area * imgAspect); // 按图片比例计算新宽度
+          const newH = area / newW; // 按面积计算新高度
+          mesh.geometry.dispose(); // 释放旧几何
+          mesh.geometry = new THREE.PlaneGeometry(newW, newH); // 替换为新几何
+        }
+      }); // 异步加载图片纹理
+      texture.colorSpace = THREE.SRGBColorSpace; // 设置色彩空间保证颜色准确
+      texture.minFilter = THREE.LinearFilter; // 关闭 mipmap 避免纹理模糊
+      texture.magFilter = THREE.LinearFilter; // 使用线性采样保持清晰度
+
+      const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        side: THREE.DoubleSide,
+      });
+
+      const geometry = new THREE.PlaneGeometry(cardW, cardH);
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.userData.photoIndex = index; // 在网格上标记索引用于命中检测
+
       const introTarget = createIntroTarget(index, photos.length); // 生成开场分布位置
-      object.position.copy(introTarget.position); // 初始化照片位置
-      object.quaternion.copy(introTarget.quaternion); // 初始化照片朝向
-      photoGroup.add(object); // 添加照片对象到总分组
-      objects.push(object); // 保存对象以便逐帧插值
+      mesh.position.copy(introTarget.position); // 初始化照片位置
+      mesh.quaternion.copy(introTarget.quaternion); // 初始化照片朝向
+      photoGroup.add(mesh); // 添加网格到总分组
+      objects.push(mesh); // 保存网格以便逐帧插值和命中检测
     });
-  }
-
-  function createPhotoCard(photo, index) {
-    // 创建单张照片的 DOM 卡片
-    const card = document.createElement("button"); // 使用按钮承载照片以支持键盘访问
-    card.className = "photo-card"; // 设置照片卡片样式类
-    card.type = "button"; // 指定按钮类型避免默认提交行为
-    card.dataset.kind = photo.kind; // 写入照片类型供样式区分
-    card.dataset.index = String(index); // 写入索引用于调试和定位
-    card.setAttribute("aria-label", `${photo.label} 预览`); // 设置无障碍名称
-
-    const img = document.createElement("img"); // 创建缩略图节点
-    img.src = photo.thumb; // 设置缩略图地址
-    img.alt = `${photo.label}，2026年6月7日杭州上城区领证`; // 设置图片替代文本
-    img.loading = index < 28 ? "eager" : "lazy"; // 前排照片优先加载，其余延迟加载
-    img.decoding = "async"; // 让浏览器异步解码图片
-    img.addEventListener("error", () => {
-      card.classList.add("is-missing"); // 图片缺失时标记卡片状态
-      card.textContent = "图片未加载"; // 图片缺失时展示通用兜底文案
-    });
-
-    card.appendChild(img); // 把缩略图加入卡片
-    card.addEventListener("pointerup", (event) => {
-      pointerTracking = false; // 卡片内抬起时也结束拖拽跟踪
-      pointerDownPhotoIndex = -1; // 清理按下时记录的照片索引
-      if (pointerMoved) return; // 拖拽后不触发照片预览
-      requestOpenViewer(index); // 用指针抬起打开当前照片预览
-    });
-    card.addEventListener("click", (event) => {
-      event.preventDefault(); // 阻止按钮默认点击造成重复行为
-      event.stopPropagation(); // 阻止点击继续冒泡到控制器
-      if (pointerMoved) return; // 拖拽后不触发照片预览
-      requestOpenViewer(index); // 保留键盘点击和浏览器点击兜底
-    });
-    return card;
   }
 
   function createIntroTarget(index, total) {
@@ -765,134 +723,6 @@
     rebuildLayouts(); // 重新计算响应式布局目标
   }
 
-  function handlePointerDown(event) {
-    // 记录指针按下位置
-    pointerTracking = true; // 开始跟踪本次指针动作
-    activePointerType = event.pointerType || "mouse"; // 保存当前指针类型用于后续拖拽判断
-    pointerStart = { x: event.clientX, y: event.clientY }; // 保存拖拽起点
-    pointerMoved = false; // 重置拖拽状态
-    pointerDownPhotoIndex = getPhotoIndexFromEvent(event); // 记录按下时的照片索引用于 PC 指针捕获兜底
-  }
-
-  function handlePointerMove(event) {
-    // 根据移动距离判断是否拖拽
-    if (!pointerTracking) return; // 未按下时不把鼠标移动误判为拖拽
-    const distanceX = Math.abs(event.clientX - pointerStart.x); // 计算横向移动距离
-    const distanceY = Math.abs(event.clientY - pointerStart.y); // 计算纵向移动距离
-    const dragDistance = Math.hypot(distanceX, distanceY); // 合成实际移动距离避免触摸轻微斜向抖动被放大
-    const dragThreshold = activePointerType === "touch" ? 24 : 8; // 触摸端放宽阈值避免轻点被误判为拖拽
-    if (dragDistance > dragThreshold) pointerMoved = true; // 超过阈值时标记为拖拽
-  }
-
-  function handlePointerUp() {
-    // 指针抬起后结束拖拽跟踪
-    pointerTracking = false; // 停止跟踪本次指针动作
-    pointerDownPhotoIndex = -1; // 清理按下时记录的照片索引
-  }
-
-  function handleTouchStart(event) {
-    // 记录触摸起点，给移动端补一条不依赖 pointer/click 的轻点路径
-    if (event.touches.length !== 1) {
-      touchTracking = false; // 多指触摸交给浏览器和控制器处理
-      return;
-    }
-    const touch = event.touches[0]; // 读取当前唯一触点
-    activePointerType = "touch"; // 标记当前输入类型为触摸
-    touchTracking = true; // 开始跟踪本次触摸轻点
-    touchMoved = false; // 重置触摸移动状态
-    pointerMoved = false; // 同步重置指针拖拽状态避免旧状态阻止轻点
-    touchStart = {
-      x: touch.clientX,
-      y: touch.clientY,
-      index: getPhotoIndexFromPoint(touch.clientX, touch.clientY),
-    }; // 保存起点坐标和照片索引
-    if (touchStart.index < 0) touchStart.index = getPhotoIndexFromTarget(event.target); // 坐标命中失败时使用事件目标兜底
-  }
-
-  function handleTouchMove(event) {
-    // 根据触摸移动距离判断是否已经变成拖拽
-    if (!touchTracking || event.touches.length !== 1) return; // 未跟踪或多指触摸时不处理轻点状态
-    const touch = event.touches[0]; // 读取当前触点
-    const distanceX = Math.abs(touch.clientX - touchStart.x); // 计算触摸横向偏移
-    const distanceY = Math.abs(touch.clientY - touchStart.y); // 计算触摸纵向偏移
-    const dragDistance = Math.hypot(distanceX, distanceY); // 合成触摸实际移动距离
-    if (dragDistance > TOUCH_TAP_DISTANCE) {
-      touchMoved = true; // 超过轻点阈值后标记为拖拽
-      pointerMoved = true; // 同步阻止 pointer/click 兜底误打开预览
-    }
-  }
-
-  function handleTouchEnd(event) {
-    // 触摸结束时稳定识别轻点照片，兼容 H5 容器丢失 pointerup/click 的情况
-    if (!touchTracking || event.changedTouches.length < 1) return; // 没有可用触点时直接退出
-    const touch = event.changedTouches[0]; // 读取结束触点
-    const distanceX = Math.abs(touch.clientX - touchStart.x); // 计算结束横向偏移
-    const distanceY = Math.abs(touch.clientY - touchStart.y); // 计算结束纵向偏移
-    const dragDistance = Math.hypot(distanceX, distanceY); // 合成触摸结束移动距离
-    const endIndex = getPhotoIndexFromPoint(touch.clientX, touch.clientY); // 按结束坐标重新命中照片
-    const index = endIndex >= 0 ? endIndex : touchStart.index; // 结束命中失败时使用按下时照片兜底
-    touchTracking = false; // 结束本次触摸跟踪
-    if (index < 0) return; // 没有触到照片时不打开预览
-    if (touchMoved || dragDistance > TOUCH_TAP_DISTANCE) return; // 拖拽旋转时不打开预览
-    event.preventDefault(); // 阻止移动端合成 click 造成重复触发
-    event.stopPropagation(); // 阻止触摸结束继续冒泡到控制器
-    requestOpenViewer(index); // 打开触摸轻点命中的照片预览
-  }
-
-  function handleTouchCancel() {
-    // 系统取消触摸时清理本次轻点状态
-    touchTracking = false; // 停止跟踪本次触摸
-    touchMoved = false; // 清理触摸移动状态
-  }
-
-  function getPhotoIndexFromTarget(target) {
-    // 从指定节点向上查找照片卡片索引
-    if (!target || !target.closest) return -1; // 事件目标不可查询时返回无效索引
-    const card = target.closest(".photo-card"); // 查找最近的照片卡片
-    if (!card) return -1; // 没有点到照片时返回无效索引
-    const index = Number(card.dataset.index); // 将 DOM 字符串索引转换为数字
-    return Number.isFinite(index) ? index : -1; // 索引有效时返回，否则兜底为无效索引
-  }
-
-  function getPhotoIndexFromPoint(clientX, clientY) {
-    // 从屏幕坐标查找照片卡片，兼容移动端 3D transform 命中不稳定
-    const pointTargets = document.elementsFromPoint ? document.elementsFromPoint(clientX, clientY) : [document.elementFromPoint(clientX, clientY)]; // 读取坐标下的多层元素
-    for (const target of pointTargets) {
-      const index = getPhotoIndexFromTarget(target); // 尝试从当前层级查找照片索引
-      if (index >= 0) return index; // 找到照片时立即返回
-    }
-    return -1; // 所有层级都没有照片时返回无效索引
-  }
-
-  function getPhotoIndexFromEvent(event) {
-    // 从事件目标或坐标兜底查找照片卡片索引
-    const eventIndex = getPhotoIndexFromTarget(event.target); // 优先使用浏览器事件目标查找照片
-    if (eventIndex >= 0) return eventIndex; // 事件目标命中照片时直接返回
-    return getPhotoIndexFromPoint(event.clientX, event.clientY); // 返回坐标命中的照片索引或无效索引
-  }
-
-  function handleRendererPointerUp(event) {
-    // 在捕获阶段优先处理照片点击，避免 OrbitControls 抢掉 PC 鼠标事件
-    const eventIndex = getPhotoIndexFromEvent(event); // 获取抬起时命中的照片索引
-    const index = eventIndex >= 0 ? eventIndex : pointerDownPhotoIndex; // 使用按下时索引兜底 PC 指针捕获场景
-    pointerTracking = false; // 指针抬起后结束拖拽跟踪
-    pointerDownPhotoIndex = -1; // 清理按下时记录的照片索引
-    if (index < 0) return; // 没有点到照片时不处理
-    if (pointerMoved) return; // 发生拖拽时不打开预览
-    event.preventDefault(); // 阻止按钮默认行为避免重复触发
-    requestOpenViewer(index); // 打开照片预览
-  }
-
-  function handleRendererClick(event) {
-    // 在捕获阶段保留 click 兜底，兼容桌面浏览器点击
-    const index = getPhotoIndexFromEvent(event); // 获取被点击照片索引
-    if (index < 0) return; // 没有点到照片时不处理
-    if (pointerMoved) return; // 发生拖拽时不打开预览
-    event.preventDefault(); // 阻止按钮默认行为避免重复触发
-    event.stopPropagation(); // 阻止事件继续交给 3D 控制器
-    requestOpenViewer(index); // 打开照片预览
-  }
-
   function requestOpenViewer(index) {
     // 防止 pointerup 和 click 连续触发两次打开
     const now = performance.now(); // 读取当前时间用于去重
@@ -902,36 +732,46 @@
   }
 
   function openViewer(index) {
-    // 打开指定照片的预览弹层
-    if (!photos.length) return; // 没有照片时直接返回
-    currentIndex = normalizeIndex(index); // 规范化预览索引
-    viewerOpen = true; // 标记预览弹层已打开
-    renderViewerPhoto(); // 渲染当前预览照片
-    viewer.classList.add("is-open"); // 显示预览弹层
-    viewer.setAttribute("aria-hidden", "false"); // 同步无障碍状态
+    if (!photos.length) return;
+
+    controls.enabled = false;
+
+    currentIndex = normalizeIndex(index);
+    viewerOpen = true;
+
+    renderViewerPhoto();
+
+    viewer.classList.add("is-open");
+    viewer.setAttribute("aria-hidden", "false");
   }
 
   function closeViewer() {
+    controls.enabled = true;
+
     viewerOpen = false;
+
     viewer.classList.remove("is-open");
     viewer.setAttribute("aria-hidden", "true");
-    // 不清空 src，避免下次打开同一张时 onload 不触发
+
+    viewerImage.src = "";
   }
 
   function renderViewerPhoto() {
     const photo = photos[currentIndex];
     if (!photo) return;
+
     viewerImage.classList.add("loading");
-    viewerImage.alt = photo.label;
-    // 直接赋值，不用 rAF 清空再赋，移动端更可靠
-    if (viewerImage.src !== photo.thumb) {
-      viewerImage.src = photo.thumb;
-    } else {
-      // src 相同时强制触发重绘
+
+    viewerImage.onload = () => {
       viewerImage.classList.remove("loading");
-    }
-    viewerImage.onload = () => viewerImage.classList.remove("loading");
-    viewerImage.onerror = () => viewerImage.classList.remove("loading");
+    };
+
+    viewerImage.onerror = () => {
+      viewerImage.classList.remove("loading");
+    };
+
+    viewerImage.alt = photo.label;
+    viewerImage.src = photo.thumb;
   }
 
   function normalizeIndex(index) {
