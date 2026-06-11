@@ -544,45 +544,91 @@
     initInteraction(); // 初始化基于 Raycaster 的交互事件
   }
 
+  function createCardMaterial(texture) {
+    // 创建带圆角的照片卡片着色器材质
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uTexture: { value: texture },
+        uRadius: { value: 0.055 },
+        uLoaded: { value: 0 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        precision highp float;
+        uniform sampler2D uTexture;
+        uniform float uRadius;
+        uniform float uLoaded;
+
+        varying vec2 vUv;
+
+        float roundedRect(vec2 uv, vec2 halfSize, float radius) {
+          vec2 d = abs(uv) - (halfSize - radius);
+          return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - radius;
+        }
+
+        void main() {
+          vec2 uv = vUv - 0.5;
+          float dist = roundedRect(uv, vec2(0.5), uRadius);
+          float alpha = 1.0 - smoothstep(0.0, 0.004, dist);
+          if (alpha < 0.01) discard;
+
+          vec4 color;
+          if (uLoaded > 0.5) {
+            color = texture2D(uTexture, vUv);
+          } else {
+            color = vec4(0.85, 0.85, 0.85, 1.0);
+          }
+
+          gl_FragColor = vec4(color.rgb, alpha);
+        }
+      `,
+      side: THREE.DoubleSide,
+      transparent: true,
+      depthWrite: false,
+    });
+  }
+
   function createPhotoObjects() {
-    // 根据照片数据创建网格纹理平面
-    const layoutScale = getSceneScale(); // 获取当前视口缩放比例，同步缩放卡片尺寸
+    // 根据照片数据创建带卡片样式（圆角/边框/渐变/发光）的 3D 网格
+    const layoutScale = getSceneScale();
     photos.forEach((photo, index) => {
-      const isFeature = photo.kind === "retouched"; // 精修图使用更大尺寸
-      const cardW = (isFeature ? 184 : 164) * layoutScale; // 卡片宽度按布局比例缩放
-      const cardH = (isFeature ? 276 : Math.round(164 * 2 / 3)) * layoutScale; // 卡片高度按布局比例缩放
+      const isFeature = photo.kind === "retouched";
+      const cardW = (isFeature ? 196 : 176) * layoutScale;
+      const cardH = (isFeature ? 294 : Math.round(176 * 2 / 3)) * layoutScale;
 
       const texture = textureLoader.load(photo.thumb, (tex) => {
-        // 图片加载后根据实际宽高比调整平面几何，避免拉伸
-        const imgAspect = tex.image.width / tex.image.height; // 图片实际宽高比
-        const planeAspect = cardW / cardH; // 当前平面宽高比
+        // 图片加载后标记已加载并调整平面几何避免拉伸
+        material.uniforms.uLoaded.value = 1;
+        const imgAspect = tex.image.width / tex.image.height;
+        const planeAspect = cardW / cardH;
         if (Math.abs(imgAspect - planeAspect) > 0.01) {
-          // 宽高比差异超过阈值时调整几何尺寸
-          const area = cardW * cardH; // 保持面积不变
-          const newW = Math.sqrt(area * imgAspect); // 按图片比例计算新宽度
-          const newH = area / newW; // 按面积计算新高度
-          mesh.geometry.dispose(); // 释放旧几何
-          mesh.geometry = new THREE.PlaneGeometry(newW, newH); // 替换为新几何
+          const area = cardW * cardH;
+          const newW = Math.sqrt(area * imgAspect);
+          const newH = area / newW;
+          mesh.geometry.dispose();
+          mesh.geometry = new THREE.PlaneGeometry(newW, newH);
         }
-      }); // 异步加载图片纹理
-      texture.colorSpace = THREE.SRGBColorSpace; // 设置色彩空间保证颜色准确
-      texture.minFilter = THREE.LinearFilter; // 关闭 mipmap 避免纹理模糊
-      texture.magFilter = THREE.LinearFilter; // 使用线性采样保持清晰度
-
-      const material = new THREE.MeshBasicMaterial({
-        map: texture,
-        side: THREE.DoubleSide,
       });
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
 
+      const material = createCardMaterial(texture);
       const geometry = new THREE.PlaneGeometry(cardW, cardH);
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.userData.photoIndex = index; // 在网格上标记索引用于命中检测
+      mesh.userData.photoIndex = index;
 
-      const introTarget = createIntroTarget(index, photos.length); // 生成开场分布位置
-      mesh.position.copy(introTarget.position); // 初始化照片位置
-      mesh.quaternion.copy(introTarget.quaternion); // 初始化照片朝向
-      photoGroup.add(mesh); // 添加网格到总分组
-      objects.push(mesh); // 保存网格以便逐帧插值和命中检测
+      const introTarget = createIntroTarget(index, photos.length);
+      mesh.position.copy(introTarget.position);
+      mesh.quaternion.copy(introTarget.quaternion);
+      photoGroup.add(mesh);
+      objects.push(mesh);
     });
   }
 
