@@ -251,10 +251,10 @@
 
       /* 预览图片加载中状态 */
       #viewerImage {
-          /* 确保图片在移动端可见 */
           display: block;
           position: relative;
           z-index: 1;
+          will-change: transform; /* 强制独立合成层，避免父级 opacity 动画影响绘制 */
       }
 
       #viewerImage.loading {
@@ -912,28 +912,26 @@
   }
 
   function closeViewer() {
-    // 关闭照片预览弹层
-    viewerOpen = false; // 标记预览弹层已关闭
-    viewer.classList.remove("is-open"); // 隐藏预览弹层
-    viewer.setAttribute("aria-hidden", "true"); // 同步无障碍状态
-    // 关闭后清空 src，避免下次打开时旧图片闪烁
-    viewerImage.src = "";
+    viewerOpen = false;
+    viewer.classList.remove("is-open");
+    viewer.setAttribute("aria-hidden", "true");
+    // 不清空 src，避免下次打开同一张时 onload 不触发
   }
 
   function renderViewerPhoto() {
-    // 渲染当前索引对应的预览照片，先清空再赋值确保移动端强制刷新图片
-    const photo = photos[currentIndex]; // 读取当前照片数据
-    if (!photo) return; // 当前照片缺失时直接返回
-    viewerImage.classList.add("loading"); // 标记加载中状态
-    // 先清空 src，强制浏览器重新触发加载（修复移动端 src 不变时不刷新的问题）
-    viewerImage.src = "";
-    // 用 rAF 保证清空后再赋新值，让移动端 WebView 可靠重绘
-    requestAnimationFrame(() => {
-      viewerImage.src = photo.thumb; // 赋值缩略图路径
-      viewerImage.alt = photo.label; // 设置预览图片替代文本
-    });
-    viewerImage.onload = () => viewerImage.classList.remove("loading"); // 加载完成后移除加载中状态
-    viewerImage.onerror = () => viewerImage.classList.remove("loading"); // 加载失败也移除加载中状态
+    const photo = photos[currentIndex];
+    if (!photo) return;
+    viewerImage.classList.add("loading");
+    viewerImage.alt = photo.label;
+    // 直接赋值，不用 rAF 清空再赋，移动端更可靠
+    if (viewerImage.src !== photo.thumb) {
+      viewerImage.src = photo.thumb;
+    } else {
+      // src 相同时强制触发重绘
+      viewerImage.classList.remove("loading");
+    }
+    viewerImage.onload = () => viewerImage.classList.remove("loading");
+    viewerImage.onerror = () => viewerImage.classList.remove("loading");
   }
 
   function normalizeIndex(index) {
