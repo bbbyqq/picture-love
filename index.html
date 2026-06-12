@@ -54,12 +54,12 @@
           content: "";
           pointer-events: none;
           background-image:
-                  linear-gradient(90deg, rgba(16, 5, 8, 0.62), rgba(16, 5, 8, 0.32)),
+                  linear-gradient(90deg, rgba(16, 5, 8, 0.46), rgba(16, 5, 8, 0.2)),
                   url("assets/photo-wall/thumbs/retouched-DSC04940.jpg");
           background-position: center;
           background-size: cover;
-          filter: blur(16px) saturate(1.04);
-          opacity: 0.36;
+          filter: blur(16px) saturate(1.18) brightness(1.08);
+          opacity: 0.44;
           transform: scale(1.06);
       }
 
@@ -70,8 +70,9 @@
           content: "";
           pointer-events: none;
           background:
-                  linear-gradient(180deg, rgba(0, 0, 0, 0.42) 0%, transparent 34%, rgba(0, 0, 0, 0.36) 100%),
-                  repeating-linear-gradient(0deg, rgba(255, 238, 203, 0.035) 0 1px, transparent 1px 7px);
+                  linear-gradient(180deg, rgba(0, 0, 0, 0.28) 0%, transparent 38%, rgba(0, 0, 0, 0.24) 100%),
+                  radial-gradient(circle at 50% 42%, rgba(255, 213, 119, 0.14), transparent 48%),
+                  repeating-linear-gradient(0deg, rgba(255, 238, 203, 0.03) 0 1px, transparent 1px 7px);
           mix-blend-mode: soft-light;
       }
 
@@ -186,7 +187,7 @@
 
           body::before {
               background-image:
-                      linear-gradient(90deg, rgba(16, 5, 8, 0.62), rgba(16, 5, 8, 0.32)),
+                      linear-gradient(90deg, rgba(16, 5, 8, 0.42), rgba(16, 5, 8, 0.18)),
                       url("assets/photo-wall/thumbs/retouched-DSC04940.jpg");
               background-position: center top;
               background-size: auto 100%;
@@ -241,7 +242,7 @@
 </head>
 <body>
 <!-- 背景音乐音频元素，自动播放并循环 -->
-<audio id="bgMusic" src="assets/你是我的女朋友-陈柯右.mp3" autoplay loop></audio>
+<audio id="bgMusic" src="assets/你是我的女朋友-陈柯右.mp3" autoplay loop preload="auto" playsinline></audio>
 
 
 
@@ -258,11 +259,11 @@
       <button class="mode-button h-9 rounded-md border border-white/20 bg-white/10 px-3 text-[13px] font-extrabold text-white transition hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button" data-layout="orbit">星环</button>
       <button class="mode-button h-9 rounded-md border border-white/20 bg-white/10 px-3 text-[13px] font-extrabold text-white transition hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button" data-layout="certificate">婚书</button>
       <button id="autoButton" class="is-active h-9 rounded-md border border-white/20 bg-white/10 px-3 text-[13px] font-extrabold text-white transition hover:border-[#ffd37c] hover:bg-[#ffd37c]/20" type="button">旋转</button>
-      <button id="muteToggle" class="h-9 rounded-md border border-white/20 bg-white/10 px-2 text-white transition hover:border-[#ffd37c] hover:bg-[#ffd37c]/20 grid place-items-center" type="button" aria-label="切换静音">
-        <svg id="volumeOnIcon" class="h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <button id="muteToggle" class="h-9 rounded-md border border-white/20 bg-white/10 px-2 text-white transition hover:border-[#ffd37c] hover:bg-[#ffd37c]/20 grid place-items-center" type="button" aria-label="切换静音" aria-pressed="true">
+        <svg id="volumeOnIcon" class="hidden h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" />
         </svg>
-        <svg id="volumeOffIcon" class="hidden h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <svg id="volumeOffIcon" class="h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z" />
           <path stroke-linecap="round" stroke-linejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
         </svg>
@@ -286,35 +287,78 @@
   </div>
 </section>
 
-<script type="module">
-  import * as THREE from "three";
-  import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-
+<script>
   // 背景音乐控制逻辑
   const bgMusic = document.querySelector("#bgMusic"); // 获取音频元素
   const muteToggle = document.querySelector("#muteToggle"); // 获取静音按钮
   const volumeOnIcon = document.querySelector("#volumeOnIcon"); // 获取音量开启图标
   const volumeOffIcon = document.querySelector("#volumeOffIcon"); // 获取音量关闭图标
-  // 切换静音状态
-  muteToggle.addEventListener("click", () => {
-    if (bgMusic.paused) {
-      bgMusic.play().catch(() => {}); // 音频尚未播放时先尝试播放
-      return; // 首次点击只负责启动播放，不切换静音
-    }
-    bgMusic.muted = !bgMusic.muted; // 音频已播放时才切换静音属性
-    volumeOnIcon.classList.toggle("hidden", bgMusic.muted); // 根据静音状态显示/隐藏音量开启图标
-    volumeOffIcon.classList.toggle("hidden", !bgMusic.muted); // 根据静音状态显示/隐藏音量关闭图标
-  });
 
-  // 用户首次交互时播放音乐（浏览器要求用户交互后才能播放音频）
-  function startMusicOnInteraction() {
-    if (!bgMusic.paused) return; // 如果已经在播放则不再重复触发
-    bgMusic.play().catch(() => {}); // 尝试播放，忽略错误
-    document.removeEventListener("click", startMusicOnInteraction); // 移除监听器，只触发一次
-    document.removeEventListener("touchstart", startMusicOnInteraction); // 移除触摸监听器
+  function hasMusicSound() {
+    return !bgMusic.paused && !bgMusic.muted; // 音频正在播放且未静音时才认为当前有声音
   }
-  document.addEventListener("click", startMusicOnInteraction); // 监听点击事件
-  document.addEventListener("touchstart", startMusicOnInteraction, { passive: true }); // 监听触摸事件
+
+  function updateMusicIcon() {
+    const isSoundOn = hasMusicSound(); // 根据真实出声状态同步按钮图标
+    volumeOnIcon.classList.toggle("hidden", !isSoundOn); // 有声音时显示音量开启图标
+    volumeOffIcon.classList.toggle("hidden", isSoundOn); // 没声音时显示静音图标
+    muteToggle.setAttribute("aria-pressed", String(!isSoundOn)); // 将按钮状态同步为当前是否无声
+  }
+
+  function tryPlayMusic() {
+    if (!bgMusic.paused) {
+      updateMusicIcon(); // 音频已播放时只同步一次当前图标
+      return Promise.resolve(true); // 音频已播放时返回成功状态
+    }
+    return bgMusic.play()
+      .then(() => {
+        updateMusicIcon(); // 播放成功后同步为真实出声状态
+        return true; // 播放成功后返回成功状态
+      })
+      .catch(() => {
+        updateMusicIcon(); // 浏览器拦截播放时同步为无声音图标
+        return false; // 播放失败后保留后续交互重试机会
+      });
+  }
+
+  function removeMusicInteractionListeners() {
+    document.removeEventListener("pointerdown", startMusicOnInteraction, true); // 播放成功后移除指针监听
+    document.removeEventListener("click", startMusicOnInteraction, true); // 播放成功后移除点击监听
+    document.removeEventListener("touchend", startMusicOnInteraction, true); // 播放成功后移除触摸结束监听
+    document.removeEventListener("keydown", startMusicOnInteraction, true); // 播放成功后移除键盘监听
+  }
+
+  function startMusicOnInteraction(event) {
+    if (muteToggle.contains(event.target)) return; // 静音按钮点击交给按钮自身逻辑处理
+    bgMusic.muted = false; // 普通页面交互表示用户希望打开声音
+    tryPlayMusic().then((isPlaying) => {
+      if (isPlaying) removeMusicInteractionListeners(); // 只有真正播放成功后才停止监听后续交互
+    });
+  }
+
+  updateMusicIcon(); // 初始化静音按钮图标
+  tryPlayMusic(); // 页面加载后先尝试自动播放，失败则等待用户交互
+  muteToggle.addEventListener("click", () => {
+    bgMusic.muted = hasMusicSound(); // 有声音时切换为静音，没声音时切换为出声
+    updateMusicIcon(); // 静音状态变化后同步按钮图标
+    tryPlayMusic().then((isPlaying) => {
+      if (isPlaying) removeMusicInteractionListeners(); // 按钮触发播放成功后也移除全局启动监听
+    });
+  });
+  bgMusic.addEventListener("play", updateMusicIcon); // 播放状态变化后同步图标
+  bgMusic.addEventListener("pause", updateMusicIcon); // 暂停状态变化后同步图标
+  bgMusic.addEventListener("volumechange", updateMusicIcon); // 静音状态变化后同步图标
+  bgMusic.addEventListener("canplay", tryPlayMusic, { once: true }); // 音频可播放后再尝试一次自动播放
+  document.addEventListener("pointerdown", startMusicOnInteraction, true); // 捕获首次指针交互以启动音乐
+  document.addEventListener("click", startMusicOnInteraction, true); // 捕获首次点击交互以兼容浏览器播放策略
+  document.addEventListener("touchend", startMusicOnInteraction, true); // 捕获首次触摸结束以兼容移动端播放策略
+  document.addEventListener("keydown", startMusicOnInteraction, true); // 捕获首次键盘交互以启动音乐
+</script>
+
+<script type="module">
+  import * as THREE from "three";
+  import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
 
   // 全部使用 assets/photo-wall/thumbs/ 目录下的图片
   const retouchedFiles = [
@@ -585,7 +629,7 @@
   }
 
   function createCardMaterial(texture) {
-    // 创建带圆角的照片卡片着色器材质
+    // 创建带圆角、暖色描边和高光的照片卡片着色器材质
     return new THREE.ShaderMaterial({
       uniforms: {
         uTexture: { value: texture },
@@ -612,20 +656,40 @@
           return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - radius;
         }
 
+        vec3 applyPhotoTone(vec3 color) {
+          color = pow(color, vec3(0.92)); // 提亮中间调，避免照片整体发暗
+          color = (color - 0.5) * 1.07 + 0.5; // 轻微增强对比度，保留照片层次
+          color *= vec3(1.08, 1.055, 1.015); // 增加暖色倾向，贴近旧版 CSS3D 卡片观感
+          return clamp(color, 0.0, 1.0);
+        }
+
         void main() {
-          vec2 uv = vUv - 0.5;
-          float dist = roundedRect(uv, vec2(0.5), uRadius);
-          float alpha = 1.0 - smoothstep(0.0, 0.004, dist);
-          if (alpha < 0.01) discard;
+          vec2 uv = vUv - 0.5; // 转换到以卡片中心为原点的坐标
+          float dist = roundedRect(uv, vec2(0.5), uRadius); // 计算当前像素到圆角卡片边缘的距离
+          float alpha = 1.0 - smoothstep(0.0, 0.004, dist); // 根据圆角距离生成透明度
+          if (alpha < 0.01) discard; // 圆角外像素直接丢弃
 
           vec4 color;
           if (uLoaded > 0.5) {
-            color = texture2D(uTexture, vUv);
+            color = texture2D(uTexture, vUv); // 图片加载完成后读取真实照片颜色
           } else {
-            color = vec4(0.85, 0.85, 0.85, 1.0);
+            color = vec4(1.0, 0.93, 0.83, 1.0); // 图片加载前使用暖色底避免灰暗闪烁
           }
 
-          gl_FragColor = vec4(color.rgb, alpha);
+          vec3 toned = applyPhotoTone(color.rgb); // 对照片做统一提亮和暖色处理
+          float topShine = smoothstep(0.88, 1.0, vUv.y) * 0.22; // 生成顶部柔和高光
+          float lowerShade = (1.0 - smoothstep(0.02, 0.42, vUv.y)) * 0.16; // 保留轻微底部压暗但避免过黑
+          float edge = smoothstep(-0.002, 0.012, -dist); // 计算卡片边缘可见范围
+          float inner = 1.0 - smoothstep(0.004, 0.014, abs(dist + 0.044)); // 生成旧版卡片内描边
+          float glow = (1.0 - smoothstep(0.0, 0.16, abs(dist))) * 0.16; // 生成靠近边缘的金色辉光
+          vec3 warmLight = vec3(1.0, 0.84, 0.48);
+          vec3 whiteLight = vec3(1.0, 0.96, 0.88);
+          toned = mix(toned, whiteLight, topShine); // 叠加顶部高光，模拟旧版 DOM 卡片光泽
+          toned = mix(toned, vec3(0.12, 0.04, 0.045), lowerShade); // 叠加轻微下阴影增强立体感
+          toned = mix(toned, warmLight, inner * 0.2); // 叠加金色内描边
+          toned += warmLight * glow * edge; // 在边缘补充暖色发光
+
+          gl_FragColor = vec4(clamp(toned, 0.0, 1.0), alpha);
         }
       `,
       side: THREE.DoubleSide,
